@@ -1,5 +1,7 @@
 #include "GatewayService.h"
 
+#include <Arduino.h>
+
 namespace jalri::gateway {
 
 GatewayService::GatewayService(const protocol::IPacketParser& parser,
@@ -12,6 +14,26 @@ GatewayService::GatewayService(const protocol::IPacketParser& parser,
       debugMode_(debugMode) {}
 
 void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
+    Serial.println("--------------------------------");
+    Serial.println("Packet Received");
+    Serial.println();
+    Serial.print("Length: ");
+    Serial.println(static_cast<unsigned>(packet.length));
+    Serial.println();
+    Serial.print("RSSI: ");
+    Serial.println(packet.rssiDbm);
+    Serial.println();
+    Serial.print("SNR: ");
+    Serial.println(static_cast<double>(packet.snrDb), 1);
+    Serial.println();
+    Serial.print("Timestamp: ");
+    Serial.println(static_cast<unsigned long>(packet.receivedAtMs));
+    Serial.println();
+    Serial.println("--------------------------------");
+    if (Serial) {
+        Serial.flush();
+    }
+
     // 1. Raw packet logged (if debugMode enabled)
     if (debugMode_) {
         const logging::RawRxLogRecord rxLog{
@@ -31,6 +53,12 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
         parser_.parse(packet.bytes, packet.length, parsed);
 
     if (parseResult != protocol::PacketParseResult::success) {
+        Serial.println("[Parser] FAILED");
+        Serial.println();
+        if (Serial) {
+            Serial.flush();
+        }
+
         const logging::RxErrorLogRecord errorLog{
             protocol::toString(parseResult),
             packet.rssiDbm,
@@ -40,12 +68,23 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
         logger_.logRxError(errorLog);
         return;
     }
+    Serial.println("[Parser] SUCCESS");
+    Serial.println();
+    if (Serial) {
+        Serial.flush();
+    }
 
     // 3. Validator
     const protocol::PacketValidationResult validationResult =
         validator_.validate(parsed);
 
     if (validationResult != protocol::PacketValidationResult::success) {
+        Serial.println("[Validator] FAILED");
+        Serial.println();
+        if (Serial) {
+            Serial.flush();
+        }
+
         const logging::RxErrorLogRecord errorLog{
             protocol::toString(validationResult),
             packet.rssiDbm,
@@ -54,6 +93,11 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
         };
         logger_.logRxError(errorLog);
         return;
+    }
+    Serial.println("[Validator] SUCCESS");
+    Serial.println();
+    if (Serial) {
+        Serial.flush();
     }
 
     // 4. DeviceRegistry

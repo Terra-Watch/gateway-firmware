@@ -12,8 +12,7 @@ void setup() {
     delay(1500);
 
     Serial.println("================================");
-    Serial.println("JALRI GATEWAY");
-    Serial.println("Firmware Starting...");
+    Serial.println("JALRI GATEWAY - Alive #9");
     Serial.println("================================");
     Serial.flush();
 
