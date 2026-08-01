@@ -11,6 +11,7 @@ class Sx1278LoRaDriver final : public ILoRaDriver {
 public:
     bool begin() override;
     bool receive(RawRadioPacket& packet) override;
+    bool send(const std::uint8_t* data, std::size_t length) override;
 
 private:
     static constexpr long frequencyHz = 433000000L;

@@ -22,6 +22,7 @@ enum class PacketValidationResult {
 
 struct ParsedPacketView {
     std::uint32_t nodeId;
+    std::uint32_t packetId;
     const char* packetTypeName;
     std::uint8_t protocolVersion;
     std::uint32_t sequenceNumber;

@@ -19,7 +19,7 @@ constexpr int loraDio0 = 14;
 }  // namespace
 
 bool Sx1278LoRaDriver::begin() {
-    SPI.begin(loraSck, loraMiso, loraMosi, loraCs);
+    SPI.begin(loraSck, loraMiso, loraMosi);
     LoRa.setPins(loraCs, loraReset, loraDio0);
 
     if (!LoRa.begin(frequencyHz)) {
@@ -65,6 +65,20 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     LoRa.receive();
 
     return bytesRead > 0U;
+}
+
+bool Sx1278LoRaDriver::send(const std::uint8_t* data, std::size_t length) {
+    if (data == nullptr || length == 0) return false;
+    LoRa.idle();
+    LoRa.beginPacket();
+    if (LoRa.write(data, length) != length) {
+        LoRa.endPacket();
+        LoRa.receive();
+        return false;
+    }
+    bool res = (LoRa.endPacket() == 1);
+    LoRa.receive();
+    return res;
 }
 
 }  // namespace jalri::lora

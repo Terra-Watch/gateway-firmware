@@ -13,7 +13,7 @@ GatewayService::GatewayService(const protocol::IPacketParser& parser,
       logger_(logger),
       debugMode_(debugMode) {}
 
-void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
+void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lora::ILoRaDriver* radioDriver) {
     Serial.println("--------------------------------");
     Serial.println("Packet Received");
     Serial.println();
@@ -98,6 +98,20 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet) {
     Serial.println();
     if (Serial) {
         Serial.flush();
+    }
+
+    // 4. Immediate ACK Transmission & Duplicate Detection
+    const bool isDuplicate = ackHandler_.processHeartbeat(
+        parsed.nodeId,
+        parsed.packetId,
+        packet.rssiDbm,
+        packet.snrDb,
+        packet.receivedAtMs,
+        radioDriver
+    );
+
+    if (isDuplicate) {
+        return; // ACK resent, skip duplicate processing
     }
 
     // 4. DeviceRegistry

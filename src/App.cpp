@@ -42,7 +42,7 @@ void App::tick() {
     lora::LoRaPacket packet{};
 
     if (loraDriver_.receive(packet)) {
-        gatewayService_.handleReceivedPacket(packet);
+        gatewayService_.handleReceivedPacket(packet, &loraDriver_);
     }
 
     if ((currentMs - lastHeartbeatMs_) >= heartbeatIntervalMs) {

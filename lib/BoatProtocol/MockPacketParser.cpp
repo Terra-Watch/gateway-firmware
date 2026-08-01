@@ -5,31 +5,38 @@ namespace jalri::protocol {
 PacketParseResult MockPacketParser::parse(const std::uint8_t* bytes,
                                           std::size_t length,
                                           ParsedPacketView& packet) const {
-    static std::uint32_t seqCounter = 1;
-
-    std::uint32_t extractedNodeId = 0x1001U;
-    std::uint32_t extractedSeq = seqCounter++;
-
-    if (bytes != nullptr && length >= 4) {
-        extractedNodeId = (static_cast<std::uint32_t>(bytes[0]) << 24) |
-                          (static_cast<std::uint32_t>(bytes[1]) << 16) |
-                          (static_cast<std::uint32_t>(bytes[2]) << 8) |
-                          static_cast<std::uint32_t>(bytes[3]);
-    }
-    if (bytes != nullptr && length >= 8) {
-        extractedSeq = (static_cast<std::uint32_t>(bytes[4]) << 24) |
-                       (static_cast<std::uint32_t>(bytes[5]) << 16) |
-                       (static_cast<std::uint32_t>(bytes[6]) << 8) |
-                       static_cast<std::uint32_t>(bytes[7]);
+    if (bytes == nullptr || length < 10) {
+        return PacketParseResult::parseFailed;
     }
 
-    packet.nodeId = extractedNodeId;
-    packet.packetTypeName = "HEARTBEAT";
-    packet.protocolVersion = 1;
-    packet.sequenceNumber = extractedSeq;
-    packet.hopCount = 0;
-    packet.ttl = 10;
-    packet.payloadLength = length;
+    if (bytes[0] != 0xA5) {
+        return PacketParseResult::parseFailed;
+    }
+
+    packet.protocolVersion = bytes[1];
+    packet.nodeId = static_cast<std::uint32_t>(bytes[3]);
+    packet.sequenceNumber = static_cast<std::uint32_t>(bytes[5]) |
+                            (static_cast<std::uint32_t>(bytes[6]) << 8);
+    packet.ttl = bytes[7];
+    packet.hopCount = bytes[8];
+    packet.payloadLength = bytes[9];
+
+    if (bytes[2] == 2) {
+        packet.packetTypeName = "HEARTBEAT";
+    } else if (bytes[2] == 4) {
+        packet.packetTypeName = "HEARTBEAT_ACK";
+    } else {
+        packet.packetTypeName = "DATA";
+    }
+
+    if (length >= 14) {
+        packet.packetId = static_cast<std::uint32_t>(bytes[10]) |
+                          (static_cast<std::uint32_t>(bytes[11]) << 8) |
+                          (static_cast<std::uint32_t>(bytes[12]) << 16) |
+                          (static_cast<std::uint32_t>(bytes[13]) << 24);
+    } else {
+        packet.packetId = 0;
+    }
 
     return PacketParseResult::success;
 }
