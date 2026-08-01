@@ -101,22 +101,34 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     }
 
     // 4. Immediate ACK Transmission & Duplicate Detection
-    const bool isDuplicate = ackHandler_.processHeartbeat(
-        parsed.nodeId,
-        parsed.packetId,
-        packet.rssiDbm,
-        packet.snrDb,
-        packet.receivedAtMs,
-        radioDriver
-    );
+    bool isDuplicate = false;
+    if (parsed.packetTypeName != nullptr && strcmp(parsed.packetTypeName, "DATA") == 0) {
+        isDuplicate = ackHandler_.processDataPacket(
+            static_cast<std::uint8_t>(parsed.nodeId),
+            static_cast<std::uint16_t>(parsed.sequenceNumber),
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs,
+            radioDriver
+        );
+    } else {
+        isDuplicate = ackHandler_.processHeartbeat(
+            parsed.nodeId,
+            parsed.packetId,
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs,
+            radioDriver
+        );
 
-    nodeRegistryService_.handleHeartbeat(
-        parsed.nodeId,
-        parsed.packetId,
-        packet.rssiDbm,
-        packet.snrDb,
-        packet.receivedAtMs
-    );
+        nodeRegistryService_.handleHeartbeat(
+            parsed.nodeId,
+            parsed.packetId,
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs
+        );
+    }
 
     if (isDuplicate) {
         return; // ACK resent, skip duplicate processing
