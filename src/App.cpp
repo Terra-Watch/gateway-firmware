@@ -39,6 +39,8 @@ bool App::begin() {
 void App::tick() {
     const std::uint32_t currentMs = millis();
 
+    gatewayService_.tick(currentMs);
+
     lora::LoRaPacket packet{};
 
     if (loraDriver_.receive(packet)) {

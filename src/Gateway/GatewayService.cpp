@@ -110,6 +110,14 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
         radioDriver
     );
 
+    nodeRegistryService_.handleHeartbeat(
+        parsed.nodeId,
+        parsed.packetId,
+        packet.rssiDbm,
+        packet.snrDb,
+        packet.receivedAtMs
+    );
+
     if (isDuplicate) {
         return; // ACK resent, skip duplicate processing
     }
@@ -138,32 +146,10 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
         };
         logger_.logDeviceRegistryEvent(registryLog);
     }
+}
 
-    // 6. Periodic 10-second Registry Output
-    if (lastTablePrintMs_ == 0 || (packet.receivedAtMs - lastTablePrintMs_ >= 10000U)) {
-        lastTablePrintMs_ = packet.receivedAtMs;
-        deviceRegistry_.updateStatus(packet.receivedAtMs);
-
-        const auto& devices = deviceRegistry_.getAllDevices();
-        std::vector<logging::RegistryTableItem> tableItems;
-        tableItems.reserve(devices.size());
-
-        for (const auto& dev : devices) {
-            std::uint32_t lastSeenSec = (packet.receivedAtMs >= dev.lastSeenTimestampMs)
-                ? ((packet.receivedAtMs - dev.lastSeenTimestampMs) / 1000U)
-                : 0U;
-            tableItems.push_back({
-                dev.nodeId,
-                registry::toString(dev.onlineStatus),
-                dev.lastRssiDbm,
-                dev.lastSnrDb,
-                dev.packetsReceived,
-                lastSeenSec
-            });
-        }
-
-        logger_.logRegistryTableSummary(tableItems.data(), tableItems.size());
-    }
+void GatewayService::tick(std::uint32_t currentMs) {
+    nodeRegistryService_.tick(currentMs);
 }
 
 }  // namespace jalri::gateway

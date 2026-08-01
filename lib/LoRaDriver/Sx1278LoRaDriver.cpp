@@ -16,13 +16,26 @@ constexpr int loraCs = 10;
 constexpr int loraReset = 9;
 constexpr int loraDio0 = 14;
 
+Sx1278LoRaDriver* g_driverInstance = nullptr;
+
+void IRAM_ATTR onLoRaReceiveISR(int packetSize) {
+    if (g_driverInstance != nullptr) {
+        g_driverInstance->handleRxInterrupt(packetSize);
+    }
+}
+
 }  // namespace
 
 bool Sx1278LoRaDriver::begin() {
+    g_driverInstance = this;
+    pinMode(loraCs, OUTPUT);
+    digitalWrite(loraCs, HIGH);
     SPI.begin(loraSck, loraMiso, loraMosi);
     LoRa.setPins(loraCs, loraReset, loraDio0);
 
     if (!LoRa.begin(frequencyHz)) {
+        Serial.println("[GATEWAY ERROR] LoRa.begin() FAILED");
+        Serial.flush();
         return false;
     }
 
@@ -31,29 +44,39 @@ bool Sx1278LoRaDriver::begin() {
     LoRa.setCodingRate4(codingRateDenominator);
     LoRa.setSyncWord(syncWord);
     LoRa.enableCrc();
+
+    LoRa.onReceive(onLoRaReceiveISR);
     LoRa.receive();
 
     return true;
 }
 
-bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
-    const int packetSize = LoRa.parsePacket();
+void IRAM_ATTR Sx1278LoRaDriver::handleRxInterrupt(int packetSize) {
+    pendingPacketSize_ = packetSize;
+    dio0Flag_ = true;
+    isrCount_++;
+}
 
-    if (packetSize <= 0) {
+bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
+    if (!dio0Flag_ || pendingPacketSize_ <= 0) {
         return false;
     }
 
-    std::size_t bytesRead = 0U;
+    const int packetSize = pendingPacketSize_;
+    dio0Flag_ = false;
+    pendingPacketSize_ = 0;
 
+    std::size_t bytesRead = 0U;
     while (LoRa.available() && bytesRead < rxBuffer_.size()) {
         const int value = LoRa.read();
-
-        if (value < 0) {
-            break;
-        }
-
+        if (value < 0) break;
         rxBuffer_[bytesRead] = static_cast<std::uint8_t>(value);
         ++bytesRead;
+    }
+
+    if (bytesRead == 0U) {
+        LoRa.receive();
+        return false;
     }
 
     packet.bytes = rxBuffer_.data();
@@ -62,21 +85,26 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     packet.snrDb = LoRa.packetSnr();
     packet.receivedAtMs = millis();
 
-    LoRa.receive();
+    packetsReceivedCounter_++;
 
-    return bytesRead > 0U;
+    LoRa.receive();
+    return true;
 }
 
 bool Sx1278LoRaDriver::send(const std::uint8_t* data, std::size_t length) {
     if (data == nullptr || length == 0) return false;
+
     LoRa.idle();
     LoRa.beginPacket();
-    if (LoRa.write(data, length) != length) {
+    const std::size_t written = LoRa.write(data, length);
+    if (written != length) {
         LoRa.endPacket();
         LoRa.receive();
         return false;
     }
     bool res = (LoRa.endPacket() == 1);
+    if (res) acksSentCounter_++;
+
     LoRa.receive();
     return res;
 }
