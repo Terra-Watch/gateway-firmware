@@ -93,4 +93,73 @@ bool GatewayAckHandler::processHeartbeat(std::uint32_t nodeId,
     return false;
 }
 
+void GatewayAckHandler::sendDataAckPacket_(std::uint8_t targetNodeId,
+                                           std::uint16_t sequenceNumber,
+                                           lora::ILoRaDriver* radioDriver) {
+    if (radioDriver == nullptr) {
+        return;
+    }
+
+    std::array<std::uint8_t, 14> ackBuf{};
+    ackBuf[0] = 0xA5; // preamble
+    ackBuf[1] = 0x03; // version
+    ackBuf[2] = 0x03; // PacketType::Acknowledgement
+    ackBuf[3] = 0xFE; // Gateway ID
+    ackBuf[4] = targetNodeId;
+    ackBuf[5] = static_cast<std::uint8_t>(ackSeq_ & 0xFFU);
+    ackBuf[6] = static_cast<std::uint8_t>((ackSeq_ >> 8U) & 0xFFU);
+    ackSeq_++;
+    ackBuf[7] = 8; // ttl
+    ackBuf[8] = 0; // hopCount
+    ackBuf[9] = 2; // payloadSize (16-bit acknowledged sequence number)
+
+    ackBuf[10] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
+    ackBuf[11] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
+
+    const std::uint16_t crc = computeCrc16_(ackBuf.data(), 12);
+    ackBuf[12] = static_cast<std::uint8_t>(crc & 0xFFU);
+    ackBuf[13] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+
+    radioDriver->send(ackBuf.data(), ackBuf.size());
+}
+
+bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
+                                          std::uint16_t sequenceNumber,
+                                          int rssiDbm,
+                                          float snrDb,
+                                          std::uint32_t timestampMs,
+                                          lora::ILoRaDriver* radioDriver) {
+    const DuplicateKey key{targetNodeId, 1U /* PacketType::Data */, sequenceNumber};
+
+    auto it = dataDuplicateMap_.find(key);
+    if (it != dataDuplicateMap_.end()) {
+        stats_.duplicatePackets++;
+        Serial.printf("--------------------------------\n");
+        Serial.printf("Duplicate Data Packet (Seq #%u)\n", sequenceNumber);
+        Serial.printf("Node: 0x%02X | RSSI: %d dBm | SNR: %.1f dB\n", targetNodeId, rssiDbm, static_cast<double>(snrDb));
+        Serial.printf("Data ACK resent\n");
+        Serial.printf("--------------------------------\n");
+        Serial.flush();
+
+        sendDataAckPacket_(targetNodeId, sequenceNumber, radioDriver);
+        return true;
+    }
+
+    dataDuplicateMap_[key] = timestampMs;
+    stats_.packetsReceived++;
+    stats_.ackSent++;
+
+    Serial.printf("--------------------------------\n");
+    Serial.printf("Data Packet received\n");
+    Serial.printf("Node: 0x%02X | Seq: %u | RSSI: %d dBm | SNR: %.1f dB\n",
+                  targetNodeId, sequenceNumber, rssiDbm, static_cast<double>(snrDb));
+
+    sendDataAckPacket_(targetNodeId, sequenceNumber, radioDriver);
+    Serial.printf("Data ACK sent\n");
+    Serial.printf("--------------------------------\n");
+    Serial.flush();
+
+    return false;
+}
+
 }  // namespace jalri::gateway
