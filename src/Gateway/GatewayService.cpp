@@ -103,7 +103,7 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     // 4. Immediate ACK Transmission & Duplicate Detection
     const bool isDuplicate = ackHandler_.processHeartbeat(
         parsed.nodeId,
-        parsed.packetId,
+        static_cast<std::uint16_t>(parsed.sequenceNumber),
         packet.rssiDbm,
         packet.snrDb,
         packet.receivedAtMs,
