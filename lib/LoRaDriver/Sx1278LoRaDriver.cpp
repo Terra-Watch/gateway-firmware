@@ -16,9 +16,18 @@ constexpr int loraCs = 10;
 constexpr int loraReset = 9;
 constexpr int loraDio0 = 14;
 
+Sx1278LoRaDriver* g_driverInstance = nullptr;
+
+void IRAM_ATTR onLoRaReceiveISR(int packetSize) {
+    if (g_driverInstance != nullptr) {
+        g_driverInstance->handleRxInterrupt(packetSize);
+    }
+}
+
 }  // namespace
 
 bool Sx1278LoRaDriver::begin() {
+    g_driverInstance = this;
     pinMode(loraCs, OUTPUT);
     digitalWrite(loraCs, HIGH);
     SPI.begin(loraSck, loraMiso, loraMosi);
@@ -36,18 +45,26 @@ bool Sx1278LoRaDriver::begin() {
     LoRa.setSyncWord(syncWord);
     LoRa.enableCrc();
 
-    // Polling mode: no onReceive callback, no SPI-in-ISR hazard.
-    // parsePacket() is called every tick from the main loop.
+    LoRa.onReceive(onLoRaReceiveISR);
     LoRa.receive();
 
     return true;
 }
 
+void IRAM_ATTR Sx1278LoRaDriver::handleRxInterrupt(int packetSize) {
+    pendingPacketSize_ = packetSize;
+    dio0Flag_ = true;
+    isrCount_++;
+}
+
 bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
-    const int packetSize = LoRa.parsePacket();
-    if (packetSize <= 0) {
+    if (!dio0Flag_ || pendingPacketSize_ <= 0) {
         return false;
     }
+
+    const int packetSize = pendingPacketSize_;
+    dio0Flag_ = false;
+    pendingPacketSize_ = 0;
 
     std::size_t bytesRead = 0U;
     while (LoRa.available() && bytesRead < rxBuffer_.size()) {
@@ -58,6 +75,7 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     }
 
     if (bytesRead == 0U) {
+        LoRa.receive();
         return false;
     }
 
@@ -69,6 +87,7 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
 
     packetsReceivedCounter_++;
 
+    LoRa.receive();
     return true;
 }
 

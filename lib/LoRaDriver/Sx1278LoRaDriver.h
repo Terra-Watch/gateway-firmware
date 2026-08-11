@@ -13,6 +13,9 @@ public:
     bool receive(RawRadioPacket& packet) override;
     bool send(const std::uint8_t* data, std::size_t length) override;
 
+    void handleRxInterrupt(int packetSize);
+
+    uint32_t isrCount() const { return isrCount_; }
     uint32_t packetsReceivedCounter() const { return packetsReceivedCounter_; }
     uint32_t acksSentCounter() const { return acksSentCounter_; }
 
@@ -24,6 +27,9 @@ private:
     static constexpr int syncWord = 0x12;
 
     std::array<std::uint8_t, 255> rxBuffer_{};
+    volatile bool dio0Flag_{false};
+    volatile int pendingPacketSize_{0};
+    volatile uint32_t isrCount_{0};
 
     uint32_t packetsReceivedCounter_{0};
     uint32_t acksSentCounter_{0};
