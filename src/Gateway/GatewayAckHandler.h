@@ -35,7 +35,7 @@ public:
 
     // Returns true if duplicate, false if new
     bool processHeartbeat(std::uint32_t nodeId,
-                         std::uint32_t packetId,
+                         std::uint16_t sequenceNumber,
                          int rssiDbm,
                          float snrDb,
                          std::uint32_t timestampMs,
@@ -52,8 +52,7 @@ public:
 
 private:
     void sendAckPacket_(std::uint8_t targetNodeId,
-                       std::uint32_t packetId,
-                       std::uint32_t timestampMs,
+                       std::uint16_t sequenceNumber,
                        lora::ILoRaDriver* radioDriver);
 
     void sendDataAckPacket_(std::uint8_t targetNodeId,
