@@ -23,6 +23,8 @@ enum class PacketValidationResult {
 struct ParsedPacketView {
     std::uint32_t nodeId;
     std::uint32_t packetId;
+    std::uint8_t destinationId;
+    std::uint8_t packetType;
     const char* packetTypeName;
     std::uint8_t protocolVersion;
     std::uint32_t sequenceNumber;
@@ -35,4 +37,3 @@ const char* toString(PacketParseResult result);
 const char* toString(PacketValidationResult result);
 
 }  // namespace jalri::protocol
-

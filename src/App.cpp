@@ -27,6 +27,8 @@ bool App::begin() {
         return false;
     }
 
+    gatewayService_.beginBackend();
+
     Serial.println("[LoRa] SX1278 initialization SUCCESS");
     Serial.println();
     if (Serial) {

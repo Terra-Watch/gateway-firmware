@@ -7,10 +7,12 @@ namespace jalri::gateway {
 GatewayService::GatewayService(const protocol::IPacketParser& parser,
                                const protocol::IPacketValidator& validator,
                                logging::ILogger& logger,
+                               backend::BackendIngestionClient& backendClient,
                                bool debugMode)
     : parser_(parser),
       validator_(validator),
       logger_(logger),
+      backendClient_(backendClient),
       debugMode_(debugMode) {}
 
 void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lora::ILoRaDriver* radioDriver) {
@@ -101,22 +103,45 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     }
 
     // 4. Immediate ACK Transmission & Duplicate Detection
-    const bool isDuplicate = ackHandler_.processHeartbeat(
-        parsed.nodeId,
-        parsed.packetId,
-        packet.rssiDbm,
-        packet.snrDb,
-        packet.receivedAtMs,
-        radioDriver
-    );
+    bool isDuplicate = false;
+    if (parsed.packetTypeName != nullptr && strcmp(parsed.packetTypeName, "DATA") == 0) {
+        isDuplicate = ackHandler_.processDataPacket(
+            static_cast<std::uint8_t>(parsed.nodeId),
+            static_cast<std::uint16_t>(parsed.sequenceNumber),
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs,
+            radioDriver
+        );
+    } else {
+        if (parsed.packetType != 2U) {
+            Serial.println("[Gateway] Unsupported non-heartbeat packet type");
+            return;
+        }
+        Serial.printf("[HEARTBEAT RX] source: 0x%02X | destination: 0x%02X | packet ID: %lu | sequence: %lu | RSSI: %d | SNR: %.1f\n",
+                      static_cast<unsigned>(parsed.nodeId), static_cast<unsigned>(parsed.destinationId),
+                      static_cast<unsigned long>(parsed.packetId), static_cast<unsigned long>(parsed.sequenceNumber),
+                      packet.rssiDbm, static_cast<double>(packet.snrDb));
+        isDuplicate = ackHandler_.processHeartbeat(
+            parsed.nodeId,
+            parsed.packetId,
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs,
+            radioDriver
+        );
 
-    nodeRegistryService_.handleHeartbeat(
-        parsed.nodeId,
-        parsed.packetId,
-        packet.rssiDbm,
-        packet.snrDb,
-        packet.receivedAtMs
-    );
+        nodeRegistryService_.handleHeartbeat(
+            parsed.nodeId,
+            parsed.packetId,
+            packet.rssiDbm,
+            packet.snrDb,
+            packet.receivedAtMs
+        );
+
+        // ACK is sent by processHeartbeat above before this backend queue operation.
+        backendClient_.enqueueHeartbeat(parsed, packet);
+    }
 
     if (isDuplicate) {
         return; // ACK resent, skip duplicate processing
@@ -148,8 +173,13 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     }
 }
 
+void GatewayService::beginBackend() {
+    backendClient_.begin();
+}
+
 void GatewayService::tick(std::uint32_t currentMs) {
     nodeRegistryService_.tick(currentMs);
+    backendClient_.tick(currentMs);
 }
 
 }  // namespace jalri::gateway

@@ -1,6 +1,16 @@
 #pragma once
 
+#include <cstdint>
+
 namespace jalri {
+
+struct BackendBuildConfig {
+    // Set these per deployment; no deployment URL is assumed here.
+    static constexpr const char* wifiSsid = "";
+    static constexpr const char* wifiPassword = "";
+    static constexpr const char* baseUrl = "";
+    static constexpr std::uint8_t gatewayId = 0xFE;
+};
 
 struct BuildConfig {
     static constexpr const char* firmwareName = "jalri-gateway-firmware";

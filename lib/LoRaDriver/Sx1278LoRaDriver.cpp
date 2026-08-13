@@ -16,18 +16,33 @@ constexpr int loraCs = 10;
 constexpr int loraReset = 9;
 constexpr int loraDio0 = 14;
 
-Sx1278LoRaDriver* g_driverInstance = nullptr;
+std::uint8_t readRegisterDiagnostic(std::uint8_t address) {
+    SPI.beginTransaction(SPISettings(200000U, MSBFIRST, SPI_MODE0));
+    digitalWrite(loraCs, LOW);
+    SPI.transfer(address & 0x7FU);
+    const std::uint8_t value = SPI.transfer(0x00U);
+    digitalWrite(loraCs, HIGH);
+    SPI.endTransaction();
+    return value;
+}
 
-void IRAM_ATTR onLoRaReceiveISR(int packetSize) {
-    if (g_driverInstance != nullptr) {
-        g_driverInstance->handleRxInterrupt(packetSize);
-    }
+void printInitializationDiagnostics() {
+    Serial.println("[GATEWAY DIAG] LoRa.begin() failure diagnostics");
+    Serial.printf("[GATEWAY DIAG] Pins: SCK=%d MISO=%d MOSI=%d CS=%d RST=%d DIO0=%d\n",
+                  loraSck, loraMiso, loraMosi, loraCs, loraReset, loraDio0);
+    Serial.printf("[GATEWAY DIAG] Pin levels: CS=%d RST=%d DIO0=%d\n",
+                  digitalRead(loraCs), digitalRead(loraReset), digitalRead(loraDio0));
+    Serial.printf("[GATEWAY DIAG] SX127x REG_VERSION(0x42)=0x%02X (expected 0x12)\n",
+                  static_cast<unsigned>(readRegisterDiagnostic(0x42U)));
+    Serial.printf("[GATEWAY DIAG] SX127x REG_OP_MODE(0x01)=0x%02X\n",
+                  static_cast<unsigned>(readRegisterDiagnostic(0x01U)));
+    Serial.printf("[GATEWAY DIAG] SX127x REG_SYNC_WORD(0x39)=0x%02X\n",
+                  static_cast<unsigned>(readRegisterDiagnostic(0x39U)));
 }
 
 }  // namespace
 
 bool Sx1278LoRaDriver::begin() {
-    g_driverInstance = this;
     pinMode(loraCs, OUTPUT);
     digitalWrite(loraCs, HIGH);
     SPI.begin(loraSck, loraMiso, loraMosi);
@@ -35,6 +50,7 @@ bool Sx1278LoRaDriver::begin() {
 
     if (!LoRa.begin(frequencyHz)) {
         Serial.println("[GATEWAY ERROR] LoRa.begin() FAILED");
+        printInitializationDiagnostics();
         Serial.flush();
         return false;
     }
@@ -45,26 +61,18 @@ bool Sx1278LoRaDriver::begin() {
     LoRa.setSyncWord(syncWord);
     LoRa.enableCrc();
 
-    LoRa.onReceive(onLoRaReceiveISR);
+    // Polling mode: no onReceive callback, no SPI-in-ISR hazard.
+    // parsePacket() is called every tick from the main loop.
     LoRa.receive();
 
     return true;
 }
 
-void IRAM_ATTR Sx1278LoRaDriver::handleRxInterrupt(int packetSize) {
-    pendingPacketSize_ = packetSize;
-    dio0Flag_ = true;
-    isrCount_++;
-}
-
 bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
-    if (!dio0Flag_ || pendingPacketSize_ <= 0) {
+    const int packetSize = LoRa.parsePacket();
+    if (packetSize <= 0) {
         return false;
     }
-
-    const int packetSize = pendingPacketSize_;
-    dio0Flag_ = false;
-    pendingPacketSize_ = 0;
 
     std::size_t bytesRead = 0U;
     while (LoRa.available() && bytesRead < rxBuffer_.size()) {
@@ -75,7 +83,6 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     }
 
     if (bytesRead == 0U) {
-        LoRa.receive();
         return false;
     }
 
@@ -87,7 +94,6 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
 
     packetsReceivedCounter_++;
 
-    LoRa.receive();
     return true;
 }
 
