@@ -40,12 +40,19 @@ void printInitializationDiagnostics() {
                   static_cast<unsigned>(readRegisterDiagnostic(0x39U)));
 }
 
+SPIClass loraSpi(FSPI);
+
 }  // namespace
 
 bool Sx1278LoRaDriver::begin() {
     pinMode(loraCs, OUTPUT);
     digitalWrite(loraCs, HIGH);
-    SPI.begin(loraSck, loraMiso, loraMosi);
+
+    pinMode(loraReset, OUTPUT);
+    digitalWrite(loraReset, HIGH);
+
+    loraSpi.begin(loraSck, loraMiso, loraMosi, loraCs);
+    LoRa.setSPI(loraSpi);
     LoRa.setPins(loraCs, loraReset, loraDio0);
 
     if (!LoRa.begin(frequencyHz)) {
