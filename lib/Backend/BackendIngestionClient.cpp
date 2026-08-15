@@ -32,7 +32,7 @@ void BackendIngestionClient::begin() {
     WiFi.begin(config_.wifiSsid, config_.wifiPassword);
     wifiStarted_ = true;
     lastWifiAttemptMs_ = millis();
-    Serial.println("[BACKEND] Wi-Fi connection started");
+    Serial.printf("[BACKEND] Wi-Fi connecting to SSID: '%s'...\n", config_.wifiSsid);
 }
 
 void BackendIngestionClient::maintainWifi_(std::uint32_t currentMs) {
@@ -43,7 +43,7 @@ void BackendIngestionClient::maintainWifi_(std::uint32_t currentMs) {
     lastWifiAttemptMs_ = currentMs;
     WiFi.disconnect();
     WiFi.begin(config_.wifiSsid, config_.wifiPassword);
-    Serial.println("[BACKEND ERROR] Wi-Fi unavailable; reconnecting");
+    Serial.printf("[BACKEND ERROR] Wi-Fi unavailable; reconnecting to '%s'\n", config_.wifiSsid);
 }
 
 bool BackendIngestionClient::enqueueHeartbeat(const protocol::ParsedPacketView& packet,

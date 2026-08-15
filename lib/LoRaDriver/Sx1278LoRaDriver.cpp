@@ -100,6 +100,7 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     packet.receivedAtMs = millis();
 
     packetsReceivedCounter_++;
+    LoRa.receive();
 
     return true;
 }
