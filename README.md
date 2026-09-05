@@ -9,7 +9,7 @@ The Gateway firmware runs on an ESP32-S3 microcontroller paired with an SX1278 L
 The firmware handles:
 
 - Continuous LoRa packet reception
-- Protocol v3 packet parsing and validation
+- Protocol v4 packet parsing and validation
 - Heartbeat ACK and Data ACK transmission back to BoatNodes
 - Duplicate packet detection
 - Device registration and liveness tracking
@@ -28,10 +28,10 @@ The Gateway is the bridge between the LoRa mesh network and the IP-based backend
 ## Implemented Features
 
 - **LoRa reception** — continuous listening for BoatNode packets via SX1278 driver
-- **Packet parsing** — protocol v3 binary packet parser extracting header fields, payload, and CRC
+- **Packet parsing** — protocol v4 binary packet parser extracting header fields, including `PreviousHop`, payload, and CRC
 - **Packet validation** — preamble, version, CRC-16, and structural integrity checks
-- **Heartbeat ACK transmission** — 21-byte acknowledgement packets constructed and sent over LoRa (preamble 0xA5, protocol v3, type 4, CRC-16)
-- **Data ACK transmission** — 14-byte acknowledgement for DATA packets (type 3)
+- **Heartbeat ACK transmission** — 22-byte acknowledgement packets constructed and sent over LoRa (preamble 0xA5, protocol v4, type 4, CRC-16)
+- **Data ACK transmission** — 15-byte acknowledgement for DATA packets (type 3), addressed to `PreviousHop`
 - **Duplicate detection** — per-node heartbeat dedup by packet ID; per-source/type/sequence dedup for DATA packets; duplicates are re-ACKed but not reprocessed
 - **Device registry** — tracks each known node (first seen, last seen, RSSI, SNR, packet count, online/offline status with configurable 30 s timeout)
 - **Node registry service** — manages node liveness with heartbeat-driven state tracking
@@ -103,7 +103,7 @@ jalri-gateway-firmware/
 │   ├── Backend/
 │   │   └── BackendIngestionClient.h/.cpp  # Wi-Fi + HTTP POST to backend
 │   ├── BoatProtocol/
-│   │   ├── PacketParser.h/.cpp      # Protocol v3 packet parser
+│   │   ├── PacketParser.h/.cpp      # Protocol v4 packet parser
 │   │   ├── PacketValidator.h/.cpp   # Preamble, version, CRC validation
 │   │   ├── IPacketParser.h          # Parser interface
 │   │   ├── IPacketValidator.h       # Validator interface
@@ -134,13 +134,17 @@ jalri-gateway-firmware/
 
 ## Configuration
 
-Configuration is defined in [`BuildConfig.h`](include/BuildConfig.h):
+Configuration is defined in [`BuildConfig.h`](include/BuildConfig.h). The default
+environment uses the development backend. The production environment explicitly
+defines `JALRI_PRODUCTION_BACKEND=1`; it does not change the development default.
 
 | Setting | Description | Default |
 |---|---|---|
 | `wifiSsid` | Wi-Fi network name | `""` (empty — must be set per deployment) |
 | `wifiPassword` | Wi-Fi password | `""` (empty) |
-| `baseUrl` | Backend API base URL | `""` (empty) |
+| `developmentBaseUrl` | Development backend API base URL | `http://172.20.10.3:8000` |
+| `productionBaseUrl` | Production backend API base URL | `https://jalari-frontend-dashboard.onrender.com` |
+| `baseUrl` | Selected backend API base URL | Development URL by default |
 | `gatewayId` | Gateway node ID | `0xFE` |
 | `firmwareVersion` | Firmware version string | `"0.1.0"` |
 | `simulationMode` | Simulation flag | `false` |
@@ -150,8 +154,11 @@ Configuration is defined in [`BuildConfig.h`](include/BuildConfig.h):
 ## Build
 
 ```bash
-# Build (default environment: esp32-s3-devkitm-1, macOS)
+# Build development configuration (default)
 pio run
+
+# Build production backend configuration explicitly
+pio run -e production
 
 # Build for Windows environment
 pio run -e windows
@@ -166,6 +173,12 @@ pio device monitor
 Platform environments are pre-configured for macOS (`/dev/cu.usbmodem5B5E0268161`) and Windows (`COM10`). Update the port in `platformio.ini` for your setup.
 
 ## Testing
+
+Gateway DATA duplicate state is bounded to 32 entries and expires after 10 seconds,
+which exceeds the direct BoatNode ACK timeout and retry window. Valid Gateway-directed
+DATA receives a type-3 ACK; broadcast DATA is processed without a unicast ACK. ACK
+transmission failures are observable in `GatewayStats::ackTxFailures`; no Gateway ACK
+retry protocol is implemented. Multi-hop and RF validation remain unimplemented.
 
 ### Protocol Contract Test
 
@@ -207,9 +220,9 @@ Not performed. The firmware builds successfully for the target platform, but phy
 
 ## Integration
 
-- **BoatNode**: Receives protocol v3 packets from the [BoatNode firmware](../jalari-node-firmware/). Both share compatible packet formats verified by the protocol contract test.
+- **BoatNode**: Receives protocol v4 packets from the [BoatNode firmware](../jalari-node-firmware/). Both share compatible packet formats verified by the protocol contract test.
 - **Backend**: Sends `HEARTBEAT_RECEIVED` events via HTTP POST to `/api/ingest/gateway` on the [Jalri backend](../website/backend/). The JSON payload includes nodeId, packetId, destination, sequence, packetSize, receivedAtMs, rssi, and snr.
-- **Protocol version**: v3 (preamble `0xA5`, 10-byte header with TTL and hop count)
+- **Protocol version**: v4 (preamble `0xA5`, 11-byte header with `PreviousHop`, TTL, and hop count; maximum packet size 61 bytes)
 
 ## Future Work
 

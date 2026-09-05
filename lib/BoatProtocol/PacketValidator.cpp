@@ -3,8 +3,8 @@
 namespace jalri::protocol {
 
 PacketValidationResult PacketValidator::validate(const ParsedPacketView& packet) const {
-    if (packet.protocolVersion != 3U || packet.nodeId == 0U) {
-        return packet.protocolVersion != 3U ? PacketValidationResult::invalidVersion
+    if (packet.protocolVersion != 4U || packet.nodeId == 0U || packet.previousHopId == 0U) {
+        return packet.protocolVersion != 4U ? PacketValidationResult::invalidVersion
                                             : PacketValidationResult::invalidHeader;
     }
     if (packet.payloadLength > 48U) {

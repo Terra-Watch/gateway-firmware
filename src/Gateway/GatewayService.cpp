@@ -105,8 +105,14 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     // 4. Immediate ACK Transmission & Duplicate Detection
     bool isDuplicate = false;
     if (parsed.packetTypeName != nullptr && strcmp(parsed.packetTypeName, "DATA") == 0) {
+        if (parsed.destinationId != 0xFEU && parsed.destinationId != 0xFFU) {
+            Serial.println("[Gateway] DATA is not addressed to Gateway or broadcast; dropped");
+            return;
+        }
         isDuplicate = ackHandler_.processDataPacket(
             static_cast<std::uint8_t>(parsed.nodeId),
+            parsed.destinationId,
+            parsed.previousHopId,
             static_cast<std::uint16_t>(parsed.sequenceNumber),
             packet.rssiDbm,
             packet.snrDb,

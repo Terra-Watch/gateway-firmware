@@ -37,7 +37,15 @@ void BackendIngestionClient::begin() {
 
 void BackendIngestionClient::maintainWifi_(std::uint32_t currentMs) {
     if (!configured_() || !wifiStarted_) return;
-    if (WiFi.status() == WL_CONNECTED) return;
+    static bool loggedConnected = false;
+    if (WiFi.status() == WL_CONNECTED) {
+        if (!loggedConnected) {
+            Serial.printf("[BACKEND] Wi-Fi CONNECTED! IP: %s\n", WiFi.localIP().toString().c_str());
+            loggedConnected = true;
+        }
+        return;
+    }
+    loggedConnected = false;
     if ((currentMs - lastWifiAttemptMs_) < wifiRetryIntervalMs) return;
 
     lastWifiAttemptMs_ = currentMs;

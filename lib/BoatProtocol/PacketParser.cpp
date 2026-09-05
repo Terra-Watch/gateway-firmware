@@ -2,7 +2,7 @@
 
 namespace jalri::protocol {
 namespace {
-constexpr std::size_t headerSize = 10U;
+constexpr std::size_t headerSize = 11U;
 constexpr std::size_t crcSize = 2U;
 constexpr std::size_t maxPayloadSize = 48U;
 
@@ -23,11 +23,11 @@ std::uint16_t crc16Ccitt(const std::uint8_t* data, std::size_t length) {
 PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
                                       std::size_t length,
                                       ParsedPacketView& packet) const {
-    if (bytes == nullptr || length < headerSize + crcSize || bytes[0] != 0xA5U || bytes[1] != 0x03U) {
+    if (bytes == nullptr || length < headerSize + crcSize || bytes[0] != 0xA5U || bytes[1] != 0x04U) {
         return PacketParseResult::parseFailed;
     }
 
-    const std::size_t payloadLength = bytes[9];
+    const std::size_t payloadLength = bytes[10];
     const std::size_t expectedLength = headerSize + payloadLength + crcSize;
     if (payloadLength > maxPayloadSize || length != expectedLength) {
         return PacketParseResult::parseFailed;
@@ -44,10 +44,11 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
     packet.packetType = bytes[2];
     packet.nodeId = bytes[3];
     packet.destinationId = bytes[4];
-    packet.sequenceNumber = static_cast<std::uint32_t>(bytes[5]) |
-                            (static_cast<std::uint32_t>(bytes[6]) << 8U);
-    packet.ttl = bytes[7];
-    packet.hopCount = bytes[8];
+    packet.previousHopId = bytes[5];
+    packet.sequenceNumber = static_cast<std::uint32_t>(bytes[6]) |
+                            (static_cast<std::uint32_t>(bytes[7]) << 8U);
+    packet.ttl = bytes[8];
+    packet.hopCount = bytes[9];
     packet.payloadLength = payloadLength;
 
     switch (packet.packetType) {
@@ -59,10 +60,10 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
     }
 
     if (packet.packetType == 2U && payloadLength >= 4U) {
-        packet.packetId = static_cast<std::uint32_t>(bytes[10]) |
-                          (static_cast<std::uint32_t>(bytes[11]) << 8U) |
-                          (static_cast<std::uint32_t>(bytes[12]) << 16U) |
-                          (static_cast<std::uint32_t>(bytes[13]) << 24U);
+        packet.packetId = static_cast<std::uint32_t>(bytes[11]) |
+                          (static_cast<std::uint32_t>(bytes[12]) << 8U) |
+                          (static_cast<std::uint32_t>(bytes[13]) << 16U) |
+                          (static_cast<std::uint32_t>(bytes[14]) << 24U);
     }
     return PacketParseResult::success;
 }

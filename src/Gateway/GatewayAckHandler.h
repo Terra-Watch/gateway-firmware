@@ -16,6 +16,7 @@ struct GatewayStats {
     int rssi = 0;
     float snr = 0.0f;
     std::uint32_t lastSeenMs = 0;
+    std::uint32_t ackTxFailures = 0;
 };
 
 struct DuplicateKey {
@@ -37,7 +38,7 @@ public:
     bool buildHeartbeatAckPacket(std::uint8_t targetNodeId,
                                  std::uint32_t packetId,
                                  std::uint32_t timestampMs,
-                                 std::array<std::uint8_t, 21>& output);
+                                 std::array<std::uint8_t, 22>& output);
 
     // Returns true if duplicate, false if new
     bool processHeartbeat(std::uint32_t nodeId,
@@ -48,6 +49,8 @@ public:
                          lora::ILoRaDriver* radioDriver);
 
     bool processDataPacket(std::uint8_t targetNodeId,
+                          std::uint8_t destinationId,
+                          std::uint8_t previousHopId,
                           std::uint16_t sequenceNumber,
                           int rssiDbm,
                           float snrDb,
@@ -57,19 +60,25 @@ public:
     const GatewayStats& stats() const { return stats_; }
 
 private:
-    void sendAckPacket_(std::uint8_t targetNodeId,
+    bool sendAckPacket_(std::uint8_t targetNodeId,
                        std::uint32_t packetId,
                        std::uint32_t timestampMs,
                        lora::ILoRaDriver* radioDriver);
 
-    void sendDataAckPacket_(std::uint8_t targetNodeId,
+    bool sendDataAckPacket_(std::uint8_t targetNodeId,
                            std::uint16_t sequenceNumber,
                            lora::ILoRaDriver* radioDriver);
 
     static std::uint16_t computeCrc16_(const std::uint8_t* data, std::size_t length);
 
-    std::map<std::uint32_t, std::uint32_t> lastPacketIdMap_{};
-    std::map<DuplicateKey, std::uint32_t> dataDuplicateMap_{};
+    struct HeartbeatDuplicateEntry { std::uint32_t nodeId = 0; std::uint32_t packetId = 0; std::uint32_t timestampMs = 0; bool active = false; };
+    struct DataDuplicateEntry { DuplicateKey key{}; std::uint32_t timestampMs = 0; bool active = false; };
+    static constexpr std::size_t duplicateCapacity_ = 32U;
+    static constexpr std::uint32_t duplicateExpiryMs_ = 10000U;
+    std::array<HeartbeatDuplicateEntry, duplicateCapacity_> heartbeatDuplicates_{};
+    std::array<DataDuplicateEntry, duplicateCapacity_> dataDuplicates_{};
+    std::size_t nextHeartbeatDuplicate_ = 0;
+    std::size_t nextDataDuplicate_ = 0;
     GatewayStats stats_{};
     std::uint16_t ackSeq_ = 1;
 };
