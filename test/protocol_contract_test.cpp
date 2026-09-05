@@ -39,6 +39,8 @@ int main() {
     std::array<std::uint8_t, jalari::constants::kMaxPacketSize> bytes{};
     std::size_t packetSize = 0;
     assert(jalari::protocol::Serializer::serialize(heartbeat, bytes, packetSize));
+    assert(bytes[0] == 0xA5U);
+    assert(bytes[1] == 0x04U);
     assert(packetSize == 26U);
 
     jalri::protocol::PacketParser gatewayParser;
