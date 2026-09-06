@@ -22,7 +22,7 @@ public:
 
     void handleReceivedPacket(const lora::RawRadioPacket& packet, lora::ILoRaDriver* radioDriver = nullptr);
     void beginBackend();
-    void tick(std::uint32_t currentMs);
+    void tick(std::uint32_t currentMs, lora::ILoRaDriver* radioDriver = nullptr);
 
     void setDebugMode(bool enabled) { debugMode_ = enabled; }
     bool debugMode() const { return debugMode_; }

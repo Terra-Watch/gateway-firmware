@@ -6,6 +6,8 @@
 #include "LoRaTypes.h"
 #include "ProtocolIntegrationTypes.h"
 
+namespace jalri::lora { class ILoRaDriver; }
+
 namespace jalri::backend {
 
 struct BackendConfig {
@@ -53,6 +55,8 @@ public:
                           const lora::RawRadioPacket& radioPacket);
     bool enqueueTelemetry(const protocol::ParsedPacketView& packet,
                           const lora::RawRadioPacket& radioPacket);
+    void dispatchMessages(lora::ILoRaDriver& radioDriver);
+    void reportCrewMessageReceipt(const protocol::ParsedPacketView& packet);
 
     void runNetworkDiagnostics();
 
@@ -76,6 +80,7 @@ private:
     bool wifiStarted_{false};
     bool diagnosticsRun_{false};
     std::uint32_t lastWifiAttemptMs_{0};
+    std::uint16_t outboundSequence_{0};
 
     bool postHeartbeat_(QueueItem& item);
     bool postTelemetry_(QueueItem& item);
@@ -83,6 +88,7 @@ private:
     void maintainWifi_(std::uint32_t currentMs);
     std::size_t getQueueDepth_() const;
     void extractHostname_(char* hostBuf, std::size_t maxLen) const;
+    bool postReceipt_(const char* clientEventId, std::uint8_t nodeId, std::uint16_t sequence, bool boatNodeReceived);
 };
 
 }  // namespace jalri::backend

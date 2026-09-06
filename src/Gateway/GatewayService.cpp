@@ -129,6 +129,9 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
             Serial.printf("temperatureC=%.2f\n", static_cast<double>(temperature) / 100.0);
             backendClient_.enqueueTelemetry(parsed, packet);
         }
+        if (!isDuplicate && parsed.payloadLength >= 21U && parsed.payload[0] == 0x4AU && parsed.payload[1] == 0x43U && parsed.payload[2] == 0x4DU && parsed.payload[3] == 0x31U) {
+            backendClient_.reportCrewMessageReceipt(parsed);
+        }
     } else {
         if (parsed.packetType != 2U) {
             Serial.println("[Gateway] Unsupported non-heartbeat packet type");
@@ -193,9 +196,10 @@ void GatewayService::beginBackend() {
     backendClient_.begin();
 }
 
-void GatewayService::tick(std::uint32_t currentMs) {
+void GatewayService::tick(std::uint32_t currentMs, lora::ILoRaDriver* radioDriver) {
     nodeRegistryService_.tick(currentMs);
     backendClient_.tick(currentMs);
+    if (radioDriver != nullptr) backendClient_.dispatchMessages(*radioDriver);
 }
 
 }  // namespace jalri::gateway

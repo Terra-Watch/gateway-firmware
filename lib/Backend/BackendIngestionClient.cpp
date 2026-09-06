@@ -1,5 +1,6 @@
 #include "BackendIngestionClient.h"
 #include "RootCA.h"
+#include "ILoRaDriver.h"
 
 #include <Arduino.h>
 #include <HTTPClient.h>
@@ -8,12 +9,63 @@
 
 #include <cstdio>
 #include <cstring>
+#include <array>
 
 namespace jalri::backend {
 
 namespace {
 constexpr std::uint32_t wifiRetryIntervalMs = 10000U;
 constexpr const char* ingestionPath = "/api/ingest/gateway";
+constexpr const char* messagePollPath = "/api/ingest/gateway/messages";
+constexpr const char* messageReceiptPath = "/api/ingest/gateway/messages/receipt";
+constexpr std::uint8_t gatewayProtocolVersion = 4U;
+constexpr std::uint8_t gatewayTtl = 8U;
+
+bool jsonStringField(const String& json, const char* key, char* out, std::size_t capacity) {
+    if (out == nullptr || capacity == 0U) return false;
+    const String marker = String("\"") + key + "\":\"";
+    const int start = json.indexOf(marker);
+    if (start < 0) return false;
+    const int valueStart = start + marker.length();
+    const int valueEnd = json.indexOf('"', valueStart);
+    if (valueEnd < 0 || static_cast<std::size_t>(valueEnd - valueStart) >= capacity) return false;
+    json.substring(valueStart, valueEnd).toCharArray(out, capacity);
+    return true;
+}
+
+bool jsonNumberField(const String& json, const char* key, std::uint32_t& value) {
+    const String marker = String("\"") + key + "\":";
+    const int start = json.indexOf(marker);
+    if (start < 0) return false;
+    value = static_cast<std::uint32_t>(json.substring(start + marker.length()).toInt());
+    return true;
+}
+
+int hexValue(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+bool parseUuid(const char* value, std::uint8_t* output) {
+    std::size_t written = 0;
+    int high = -1;
+    for (const char* p = value; *p != '\0'; ++p) {
+        if (*p == '-') continue;
+        const int digit = hexValue(*p);
+        if (digit < 0) return false;
+        if (high < 0) high = digit;
+        else { if (written >= 16U) return false; output[written++] = static_cast<std::uint8_t>((high << 4) | digit); high = -1; }
+    }
+    return written == 16U && high < 0;
+}
+
+std::uint16_t crc16(const std::uint8_t* data, std::size_t length) {
+    std::uint16_t crc = 0xFFFFU;
+    for (std::size_t i = 0; i < length; ++i) { crc ^= static_cast<std::uint16_t>(data[i]) << 8U; for (std::uint8_t bit = 0; bit < 8U; ++bit) crc = (crc & 0x8000U) ? static_cast<std::uint16_t>((crc << 1U) ^ 0x1021U) : static_cast<std::uint16_t>(crc << 1U); }
+    return crc;
+}
 }  // namespace
 
 BackendIngestionClient::BackendIngestionClient(const BackendConfig& config)
@@ -422,6 +474,63 @@ void BackendIngestionClient::tick(std::uint32_t currentMs) {
         }
         break;
     }
+}
+
+void BackendIngestionClient::dispatchMessages(lora::ILoRaDriver& radioDriver) {
+    if (WiFi.status() != WL_CONNECTED || !configured_()) return;
+    WiFiClientSecure client;
+    client.setCACert(PRODUCTION_ROOT_CA);
+    client.setTimeout(requestTimeoutMs / 1000U);
+    HTTPClient http;
+    if (!http.begin(client, String(config_.baseUrl) + messagePollPath)) return;
+    http.setConnectTimeout(requestTimeoutMs);
+    http.setTimeout(requestTimeoutMs);
+    const int status = http.GET();
+    String response = status >= 200 && status < 300 ? http.getString() : String();
+    http.end();
+    if (response.length() == 0) return;
+
+    char clientEventId[40]{};
+    char text[32]{};
+    std::uint32_t nodeId = 0;
+    if (!jsonStringField(response, "clientEventId", clientEventId, sizeof(clientEventId)) ||
+        !jsonStringField(response, "text", text, sizeof(text)) ||
+        !jsonNumberField(response, "nodeId", nodeId) || nodeId == 0U || nodeId > 255U) return;
+
+    const std::size_t textLength = std::strlen(text);
+    if (textLength == 0U || textLength > 27U) return;
+    std::array<std::uint8_t, 61> packet{};
+    packet[0] = 0xA5U; packet[1] = gatewayProtocolVersion; packet[2] = 1U;
+    packet[3] = config_.gatewayId; packet[4] = static_cast<std::uint8_t>(nodeId); packet[5] = config_.gatewayId;
+    packet[6] = static_cast<std::uint8_t>(outboundSequence_ & 0xFFU); packet[7] = static_cast<std::uint8_t>((outboundSequence_ >> 8U) & 0xFFU); ++outboundSequence_;
+    packet[8] = gatewayTtl; packet[9] = 0U; packet[10] = static_cast<std::uint8_t>(21U + textLength);
+    const std::size_t payloadOffset = 11U;
+    packet[payloadOffset] = 0x4AU; packet[payloadOffset + 1U] = 0x43U; packet[payloadOffset + 2U] = 0x4DU; packet[payloadOffset + 3U] = 0x31U;
+    if (!parseUuid(clientEventId, packet.data() + payloadOffset + 4U)) return;
+    packet[payloadOffset + 20U] = static_cast<std::uint8_t>(textLength);
+    std::memcpy(packet.data() + payloadOffset + 21U, text, textLength);
+    const std::size_t bodyLength = 11U + 21U + textLength;
+    const std::uint16_t crc = crc16(packet.data(), bodyLength);
+    packet[bodyLength] = static_cast<std::uint8_t>(crc & 0xFFU); packet[bodyLength + 1U] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    if (!radioDriver.send(packet.data(), bodyLength + 2U)) return;
+    postReceipt_(clientEventId, static_cast<std::uint8_t>(nodeId), static_cast<std::uint16_t>(outboundSequence_ - 1U), false);
+}
+
+void BackendIngestionClient::reportCrewMessageReceipt(const protocol::ParsedPacketView& packet) {
+    if (packet.payloadLength < 21U || packet.payload[0] != 0x4AU || packet.payload[1] != 0x43U || packet.payload[2] != 0x4DU || packet.payload[3] != 0x31U) return;
+    char clientEventId[37]{}; const std::uint8_t* id = packet.payload + 4U; const char* hex = "0123456789abcdef"; std::size_t offset = 0;
+    for (std::size_t i = 0; i < 16U; ++i) { if (i == 4U || i == 6U || i == 8U || i == 10U) clientEventId[offset++] = '-'; clientEventId[offset++] = hex[id[i] >> 4U]; clientEventId[offset++] = hex[id[i] & 0x0FU]; }
+    clientEventId[offset] = '\0';
+    postReceipt_(clientEventId, static_cast<std::uint8_t>(packet.nodeId), static_cast<std::uint16_t>(packet.sequenceNumber), true);
+}
+
+bool BackendIngestionClient::postReceipt_(const char* clientEventId, std::uint8_t nodeId, std::uint16_t sequence, bool boatNodeReceived) {
+    WiFiClientSecure client; client.setCACert(PRODUCTION_ROOT_CA); client.setTimeout(requestTimeoutMs / 1000U);
+    HTTPClient http; if (!http.begin(client, String(config_.baseUrl) + messageReceiptPath)) return false;
+    http.setConnectTimeout(requestTimeoutMs); http.setTimeout(requestTimeoutMs); http.addHeader("Content-Type", "application/json");
+    char body[180]{}; const int length = std::snprintf(body, sizeof(body), "{\"clientEventId\":\"%s\",\"nodeId\":%u,\"sequence\":%u,\"boatNodeReceived\":%s}", clientEventId, static_cast<unsigned>(nodeId), static_cast<unsigned>(sequence), boatNodeReceived ? "true" : "false");
+    const int status = length > 0 ? http.POST(reinterpret_cast<std::uint8_t*>(body), static_cast<std::size_t>(length)) : -1; http.end();
+    return status >= 200 && status < 300;
 }
 
 }  // namespace jalri::backend
