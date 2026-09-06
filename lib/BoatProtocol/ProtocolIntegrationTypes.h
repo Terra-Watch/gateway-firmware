@@ -32,6 +32,7 @@ struct ParsedPacketView {
     std::uint8_t hopCount;
     std::uint8_t ttl;
     std::size_t payloadLength;
+    std::uint8_t payload[48]{};
 };
 
 const char* toString(PacketParseResult result);

@@ -50,6 +50,7 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
     packet.ttl = bytes[8];
     packet.hopCount = bytes[9];
     packet.payloadLength = payloadLength;
+    for (std::size_t i = 0; i < payloadLength; ++i) packet.payload[i] = bytes[headerSize + i];
 
     switch (packet.packetType) {
     case 1U: packet.packetTypeName = "DATA"; break;

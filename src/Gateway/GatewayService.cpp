@@ -119,6 +119,16 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
             packet.receivedAtMs,
             radioDriver
         );
+        if (!isDuplicate && parsed.payloadLength == 12U && parsed.payload[0] == 0x54U && parsed.payload[1] == 1U) {
+            const auto *p = parsed.payload;
+            const std::uint16_t year = static_cast<std::uint16_t>(p[3] | (p[4] << 8U));
+            const std::int16_t temperature = static_cast<std::int16_t>(static_cast<std::uint16_t>(p[10] | (p[11] << 8U)));
+            Serial.println("[TELEMETRY RX]");
+            Serial.printf("source=0x%02X\n", static_cast<unsigned>(parsed.nodeId));
+            Serial.printf("sequence=%lu\n", static_cast<unsigned long>(parsed.sequenceNumber));
+            Serial.printf("temperatureC=%.2f\n", static_cast<double>(temperature) / 100.0);
+            backendClient_.enqueueTelemetry(parsed, packet);
+        }
     } else {
         if (parsed.packetType != 2U) {
             Serial.println("[Gateway] Unsupported non-heartbeat packet type");

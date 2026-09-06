@@ -3,14 +3,14 @@
 #include <cstdint>
 
 #ifndef JALRI_PRODUCTION_BACKEND
-#define JALRI_PRODUCTION_BACKEND 0
+#define JALRI_PRODUCTION_BACKEND 1
 #endif
 
 namespace jalri {
 
 struct BackendBuildConfig {
     // Development remains the default; production is selected explicitly at build time.
-    static constexpr const char* wifiSsid = "JalriHotspot";
+    static constexpr const char* wifiSsid = "Kireeti";
     static constexpr const char* wifiPassword = "kireetiv";
     static constexpr const char* developmentBaseUrl = "http://172.20.10.3:8000";
     static constexpr const char* productionBaseUrl = "https://jalari-frontend-dashboard.onrender.com";
