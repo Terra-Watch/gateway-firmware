@@ -156,6 +156,58 @@ bool GatewayAckHandler::sendDataAckPacket_(std::uint8_t targetNodeId,
     return sent;
 }
 
+bool GatewayAckHandler::sendEndToEndAckPacket_(std::uint8_t sourceNodeId,
+                                               std::uint16_t sequenceNumber,
+                                               lora::ILoRaDriver* radioDriver) {
+    if (radioDriver == nullptr) return false;
+    std::array<std::uint8_t, 15> buf{};
+    buf[0] = 0xA5; buf[1] = 0x04;
+    buf[2] = 0x06; // PacketType::EndToEndAck
+    buf[3] = 0xFE; buf[4] = sourceNodeId; buf[5] = 0xFE;
+    buf[6] = static_cast<std::uint8_t>(ackSeq_ & 0xFFU);
+    buf[7] = static_cast<std::uint8_t>((ackSeq_ >> 8U) & 0xFFU);
+    ackSeq_++;
+    buf[8] = 8; buf[9] = 0; buf[10] = 2;
+    buf[11] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
+    buf[12] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(buf.data(), 13);
+    buf[13] = static_cast<std::uint8_t>(crc & 0xFFU);
+    buf[14] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    return radioDriver->send(buf.data(), buf.size());
+}
+
+bool GatewayAckHandler::sendRouteAdvertisement_(lora::ILoRaDriver* radioDriver) {
+    if (radioDriver == nullptr) return false;
+    std::array<std::uint8_t, 19> buf{};
+    buf[0] = 0xA5; buf[1] = 0x04;
+    buf[2] = 0x05; // PacketType::RouteAdvertisement
+    buf[3] = 0xFE; buf[4] = 0xFF; buf[5] = 0xFE;
+    buf[6] = static_cast<std::uint8_t>(ackSeq_ & 0xFFU);
+    buf[7] = static_cast<std::uint8_t>((ackSeq_ >> 8U) & 0xFFU);
+    ackSeq_++;
+    buf[8] = 1; buf[9] = 0; buf[10] = 6;
+    buf[11] = 0xFE; // destination being advertised: the gateway itself
+    buf[12] = 1; buf[13] = 0; // route cost 1 (x100 scale: a neighbour adds its own link cost), minimum
+    buf[14] = 1; // hop count
+    if (advertVersion_ == 0) advertVersion_ = static_cast<std::uint16_t>(esp_random() & 0xFFFFU);
+    ++advertVersion_;
+    buf[15] = static_cast<std::uint8_t>(advertVersion_ & 0xFFU);
+    buf[16] = static_cast<std::uint8_t>((advertVersion_ >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(buf.data(), 17);
+    buf[17] = static_cast<std::uint8_t>(crc & 0xFFU);
+    buf[18] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    return radioDriver->send(buf.data(), buf.size());
+}
+
+void GatewayAckHandler::maybeAdvertiseRoute(std::uint32_t nowMs, lora::ILoRaDriver* radioDriver) {
+    if (static_cast<std::int32_t>(nowMs - nextAdvertMs_) < 0) return;
+    if (sendRouteAdvertisement_(radioDriver)) {
+        Serial.printf("[ROUTE ADVERT TX] gateway root, version %u\n", advertVersion_);
+        ++advertsSent_;
+    }
+    nextAdvertMs_ = nowMs + (advertsSent_ == 0U ? 3000U : advertsSent_ == 1U ? 7000U : advertsSent_ == 2U ? 15000U : 60000U);
+}
+
 bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
                                           std::uint8_t destinationId,
                                           std::uint8_t previousHopId,
@@ -168,7 +220,7 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
     bool duplicate = false;
     for (auto& entry : dataDuplicates_) {
         if (!entry.active) continue;
-        if (timestampMs - entry.timestampMs >= duplicateExpiryMs_) { entry.active = false; continue; }
+        if (timestampMs - entry.timestampMs >= dataDuplicateExpiryMs_) { entry.active = false; continue; }
         if (entry.key.sourceId == key.sourceId && entry.key.type == key.type && entry.key.sequenceNumber == key.sequenceNumber) duplicate = true;
     }
     if (duplicate) {
@@ -181,6 +233,7 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
         Serial.flush();
 
         if (destinationId == 0xFEU && sendDataAckPacket_(previousHopId, sequenceNumber, radioDriver)) stats_.ackSent++;
+        if (destinationId == 0xFEU && previousHopId != targetNodeId) (void)sendEndToEndAckPacket_(targetNodeId, sequenceNumber, radioDriver);
         return true;
     }
 
@@ -197,6 +250,8 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
                   targetNodeId, sequenceNumber, rssiDbm, static_cast<double>(snrDb));
 
     if (destinationId == 0xFEU && sendDataAckPacket_(previousHopId, sequenceNumber, radioDriver)) stats_.ackSent++;
+    if (destinationId == 0xFEU && previousHopId != targetNodeId && sendEndToEndAckPacket_(targetNodeId, sequenceNumber, radioDriver))
+        Serial.printf("[E2E ACK TX] node 0x%02X seq %u (came through relay 0x%02X)\n", targetNodeId, sequenceNumber, previousHopId);
     Serial.printf("Data ACK sent\n");
     Serial.printf("--------------------------------\n");
     Serial.flush();

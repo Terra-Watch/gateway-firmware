@@ -57,6 +57,10 @@ public:
                           std::uint32_t timestampMs,
                           lora::ILoRaDriver* radioDriver);
 
+    // The gateway is the root of the collection tree: it advertises itself as destination 0xFE so relays learn a route to it.
+    // Called often; sends at 3 s, 10 s and 25 s after start (so a freshly powered relay finds it quickly), then once a minute.
+    void maybeAdvertiseRoute(std::uint32_t nowMs, lora::ILoRaDriver* radioDriver);
+
     const GatewayStats& stats() const { return stats_; }
 
 private:
@@ -64,6 +68,13 @@ private:
                        std::uint32_t packetId,
                        std::uint32_t timestampMs,
                        lora::ILoRaDriver* radioDriver);
+
+    bool sendRouteAdvertisement_(lora::ILoRaDriver* radioDriver);
+
+    // Tells the field node that wrote a packet that it reached the gateway, when the hop ACK alone cannot (the packet came through a relay).
+    bool sendEndToEndAckPacket_(std::uint8_t sourceNodeId,
+                               std::uint16_t sequenceNumber,
+                               lora::ILoRaDriver* radioDriver);
 
     bool sendDataAckPacket_(std::uint8_t targetNodeId,
                            std::uint16_t sequenceNumber,
@@ -75,12 +86,17 @@ private:
     struct DataDuplicateEntry { DuplicateKey key{}; std::uint32_t timestampMs = 0; bool active = false; };
     static constexpr std::size_t duplicateCapacity_ = 32U;
     static constexpr std::uint32_t duplicateExpiryMs_ = 10000U;
+    // A field node resends data the gateway never confirmed end to end after 12 s or more; remember longer than that so it is confirmed, not stored twice.
+    static constexpr std::uint32_t dataDuplicateExpiryMs_ = 120000U;
     std::array<HeartbeatDuplicateEntry, duplicateCapacity_> heartbeatDuplicates_{};
     std::array<DataDuplicateEntry, duplicateCapacity_> dataDuplicates_{};
     std::size_t nextHeartbeatDuplicate_ = 0;
     std::size_t nextDataDuplicate_ = 0;
     GatewayStats stats_{};
     std::uint16_t ackSeq_ = 1;
+    std::uint16_t advertVersion_ = 0;
+    std::uint32_t nextAdvertMs_ = 3000U;
+    std::uint8_t advertsSent_ = 0;
 };
 
 }  // namespace terrawatch::gateway

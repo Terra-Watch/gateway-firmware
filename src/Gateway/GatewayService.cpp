@@ -190,7 +190,7 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
 
 void GatewayService::tick(std::uint32_t currentMs, lora::ILoRaDriver* radioDriver) {
     nodeRegistryService_.tick(currentMs);
-    (void)radioDriver;
+    ackHandler_.maybeAdvertiseRoute(currentMs, radioDriver);
 
     if (currentMs - lastStatsMs_ >= 10000U) {
         lastStatsMs_ = currentMs;
