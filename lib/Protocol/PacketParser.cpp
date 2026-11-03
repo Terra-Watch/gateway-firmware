@@ -2,7 +2,7 @@
 
 namespace terrawatch::protocol {
 namespace {
-constexpr std::size_t headerSize = 11U;
+constexpr std::size_t headerSize = 12U; // protocol v5: byte 11 is the next hop
 constexpr std::size_t crcSize = 2U;
 constexpr std::size_t maxPayloadSize = 48U;
 
@@ -23,7 +23,7 @@ std::uint16_t crc16Ccitt(const std::uint8_t* data, std::size_t length) {
 PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
                                       std::size_t length,
                                       ParsedPacketView& packet) const {
-    if (bytes == nullptr || length < headerSize + crcSize || bytes[0] != 0xA5U || bytes[1] != 0x04U) {
+    if (bytes == nullptr || length < headerSize + crcSize || bytes[0] != 0xA5U || bytes[1] != 0x05U) {
         return PacketParseResult::parseFailed;
     }
 
@@ -49,6 +49,7 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
                             (static_cast<std::uint32_t>(bytes[7]) << 8U);
     packet.ttl = bytes[8];
     packet.hopCount = bytes[9];
+    packet.nextHopId = bytes[11];
     packet.payloadLength = payloadLength;
     for (std::size_t i = 0; i < payloadLength; ++i) packet.payload[i] = bytes[headerSize + i];
 
@@ -61,10 +62,10 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
     }
 
     if (packet.packetType == 2U && payloadLength >= 4U) {
-        packet.packetId = static_cast<std::uint32_t>(bytes[11]) |
-                          (static_cast<std::uint32_t>(bytes[12]) << 8U) |
-                          (static_cast<std::uint32_t>(bytes[13]) << 16U) |
-                          (static_cast<std::uint32_t>(bytes[14]) << 24U);
+        packet.packetId = static_cast<std::uint32_t>(bytes[12]) |
+                          (static_cast<std::uint32_t>(bytes[13]) << 8U) |
+                          (static_cast<std::uint32_t>(bytes[14]) << 16U) |
+                          (static_cast<std::uint32_t>(bytes[15]) << 24U);
     }
     return PacketParseResult::success;
 }

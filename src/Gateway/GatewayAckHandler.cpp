@@ -5,6 +5,17 @@
 
 namespace terrawatch::gateway {
 
+namespace {
+// A starting route version that differs from boot to boot, so nodes holding the version of the previous run still see a newer one about half the time.
+std::uint16_t randomSeed16_() {
+#ifdef ARDUINO
+    return static_cast<std::uint16_t>(esp_random() & 0xFFFFU);
+#else
+    return 1U;
+#endif
+}
+}  // namespace
+
 std::uint16_t GatewayAckHandler::computeCrc16_(const std::uint8_t* data, std::size_t length) {
     std::uint16_t crc = 0xFFFFU;
     for (std::size_t i = 0; i < length; ++i) {
@@ -28,7 +39,7 @@ bool GatewayAckHandler::sendAckPacket_(std::uint8_t targetNodeId,
         return false;
     }
 
-    std::array<std::uint8_t, 22> ackBuf{};
+    std::array<std::uint8_t, 23> ackBuf{};
     if (!buildHeartbeatAckPacket(targetNodeId, packetId, timestampMs, ackBuf)) return false;
 
     const bool sent = radioDriver->send(ackBuf.data(), ackBuf.size());
@@ -39,10 +50,10 @@ bool GatewayAckHandler::sendAckPacket_(std::uint8_t targetNodeId,
 bool GatewayAckHandler::buildHeartbeatAckPacket(std::uint8_t targetNodeId,
                                                 std::uint32_t packetId,
                                                 std::uint32_t timestampMs,
-                                                std::array<std::uint8_t, 22>& ackBuf) {
+                                                std::array<std::uint8_t, 23>& ackBuf) {
     ackBuf.fill(0);
     ackBuf[0] = 0xA5; // preamble
-    ackBuf[1] = 0x04; // version
+    ackBuf[1] = 0x05; // version 5: the header carries the next hop (byte 11)
     ackBuf[2] = 0x04; // PacketType::HeartbeatAck (4)
     ackBuf[3] = 0xFE; // Gateway ID (Source)
     ackBuf[4] = targetNodeId; // Destination ID
@@ -53,20 +64,21 @@ bool GatewayAckHandler::buildHeartbeatAckPacket(std::uint8_t targetNodeId,
     ackBuf[8] = 8; // ttl
     ackBuf[9] = 0; // hopCount
     ackBuf[10] = 9; // packet ID (4), target node ID (1), gateway timestamp (4)
+    ackBuf[11] = targetNodeId; // next hop
 
-    ackBuf[11] = static_cast<std::uint8_t>(packetId & 0xFFU);
-    ackBuf[12] = static_cast<std::uint8_t>((packetId >> 8U) & 0xFFU);
-    ackBuf[13] = static_cast<std::uint8_t>((packetId >> 16U) & 0xFFU);
-    ackBuf[14] = static_cast<std::uint8_t>((packetId >> 24U) & 0xFFU);
-    ackBuf[15] = targetNodeId;
-    ackBuf[16] = static_cast<std::uint8_t>(timestampMs & 0xFFU);
-    ackBuf[17] = static_cast<std::uint8_t>((timestampMs >> 8U) & 0xFFU);
-    ackBuf[18] = static_cast<std::uint8_t>((timestampMs >> 16U) & 0xFFU);
-    ackBuf[19] = static_cast<std::uint8_t>((timestampMs >> 24U) & 0xFFU);
+    ackBuf[12] = static_cast<std::uint8_t>(packetId & 0xFFU);
+    ackBuf[13] = static_cast<std::uint8_t>((packetId >> 8U) & 0xFFU);
+    ackBuf[14] = static_cast<std::uint8_t>((packetId >> 16U) & 0xFFU);
+    ackBuf[15] = static_cast<std::uint8_t>((packetId >> 24U) & 0xFFU);
+    ackBuf[16] = targetNodeId;
+    ackBuf[17] = static_cast<std::uint8_t>(timestampMs & 0xFFU);
+    ackBuf[18] = static_cast<std::uint8_t>((timestampMs >> 8U) & 0xFFU);
+    ackBuf[19] = static_cast<std::uint8_t>((timestampMs >> 16U) & 0xFFU);
+    ackBuf[20] = static_cast<std::uint8_t>((timestampMs >> 24U) & 0xFFU);
 
-    const std::uint16_t crc = computeCrc16_(ackBuf.data(), 20);
-    ackBuf[20] = static_cast<std::uint8_t>(crc & 0xFFU);
-    ackBuf[21] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(ackBuf.data(), 21);
+    ackBuf[21] = static_cast<std::uint8_t>(crc & 0xFFU);
+    ackBuf[22] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
 
     return true;
 }
@@ -115,7 +127,7 @@ bool GatewayAckHandler::processHeartbeat(std::uint32_t nodeId,
                   static_cast<unsigned>(nodeId), static_cast<unsigned long>(packetId), rssiDbm, static_cast<double>(snrDb));
 
     if (sendAckPacket_(static_cast<std::uint8_t>(nodeId), packetId, timestampMs, radioDriver)) stats_.ackSent++;
-    Serial.printf("[HEARTBEAT ACK TX] type: 4 | source: 0xFE | target: 0x%02X | ack packet ID: %lu | size: 22\n",
+    Serial.printf("[HEARTBEAT ACK TX] type: 4 | source: 0xFE | target: 0x%02X | ack packet ID: %lu | size: 23\n",
                   static_cast<unsigned>(nodeId), static_cast<unsigned long>(packetId));
     Serial.printf("--------------------------------\n");
     Serial.flush();
@@ -130,9 +142,9 @@ bool GatewayAckHandler::sendDataAckPacket_(std::uint8_t targetNodeId,
         return false;
     }
 
-    std::array<std::uint8_t, 15> ackBuf{};
+    std::array<std::uint8_t, 16> ackBuf{};
     ackBuf[0] = 0xA5; // preamble
-    ackBuf[1] = 0x04; // version
+    ackBuf[1] = 0x05; // version 5: the header carries the next hop (byte 11)
     ackBuf[2] = 0x03; // PacketType::Acknowledgement
     ackBuf[3] = 0xFE; // Gateway ID
     ackBuf[4] = targetNodeId;
@@ -143,13 +155,14 @@ bool GatewayAckHandler::sendDataAckPacket_(std::uint8_t targetNodeId,
     ackBuf[8] = 8; // ttl
     ackBuf[9] = 0; // hopCount
     ackBuf[10] = 2; // payloadSize (16-bit acknowledged sequence number)
+    ackBuf[11] = targetNodeId; // next hop
 
-    ackBuf[11] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
-    ackBuf[12] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
+    ackBuf[12] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
+    ackBuf[13] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
 
-    const std::uint16_t crc = computeCrc16_(ackBuf.data(), 13);
-    ackBuf[13] = static_cast<std::uint8_t>(crc & 0xFFU);
-    ackBuf[14] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(ackBuf.data(), 14);
+    ackBuf[14] = static_cast<std::uint8_t>(crc & 0xFFU);
+    ackBuf[15] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
 
     const bool sent = radioDriver->send(ackBuf.data(), ackBuf.size());
     if (!sent) stats_.ackTxFailures++;
@@ -158,44 +171,47 @@ bool GatewayAckHandler::sendDataAckPacket_(std::uint8_t targetNodeId,
 
 bool GatewayAckHandler::sendEndToEndAckPacket_(std::uint8_t sourceNodeId,
                                                std::uint16_t sequenceNumber,
+                                               std::uint8_t nextHopId,
                                                lora::ILoRaDriver* radioDriver) {
     if (radioDriver == nullptr) return false;
-    std::array<std::uint8_t, 15> buf{};
-    buf[0] = 0xA5; buf[1] = 0x04;
+    std::array<std::uint8_t, 16> buf{};
+    buf[0] = 0xA5; buf[1] = 0x05;
     buf[2] = 0x06; // PacketType::EndToEndAck
     buf[3] = 0xFE; buf[4] = sourceNodeId; buf[5] = 0xFE;
     buf[6] = static_cast<std::uint8_t>(ackSeq_ & 0xFFU);
     buf[7] = static_cast<std::uint8_t>((ackSeq_ >> 8U) & 0xFFU);
     ackSeq_++;
     buf[8] = 8; buf[9] = 0; buf[10] = 2;
-    buf[11] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
-    buf[12] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
-    const std::uint16_t crc = computeCrc16_(buf.data(), 13);
-    buf[13] = static_cast<std::uint8_t>(crc & 0xFFU);
-    buf[14] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    buf[11] = nextHopId; // the relay the data came through: the way back is the way it came
+    buf[12] = static_cast<std::uint8_t>(sequenceNumber & 0xFFU);
+    buf[13] = static_cast<std::uint8_t>((sequenceNumber >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(buf.data(), 14);
+    buf[14] = static_cast<std::uint8_t>(crc & 0xFFU);
+    buf[15] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
     return radioDriver->send(buf.data(), buf.size());
 }
 
 bool GatewayAckHandler::sendRouteAdvertisement_(lora::ILoRaDriver* radioDriver) {
     if (radioDriver == nullptr) return false;
-    std::array<std::uint8_t, 19> buf{};
-    buf[0] = 0xA5; buf[1] = 0x04;
+    std::array<std::uint8_t, 20> buf{};
+    buf[0] = 0xA5; buf[1] = 0x05;
     buf[2] = 0x05; // PacketType::RouteAdvertisement
     buf[3] = 0xFE; buf[4] = 0xFF; buf[5] = 0xFE;
     buf[6] = static_cast<std::uint8_t>(ackSeq_ & 0xFFU);
     buf[7] = static_cast<std::uint8_t>((ackSeq_ >> 8U) & 0xFFU);
     ackSeq_++;
     buf[8] = 1; buf[9] = 0; buf[10] = 6;
-    buf[11] = 0xFE; // destination being advertised: the gateway itself
-    buf[12] = 1; buf[13] = 0; // route cost 1 (x100 scale: a neighbour adds its own link cost), minimum
-    buf[14] = 1; // hop count
-    if (advertVersion_ == 0) advertVersion_ = static_cast<std::uint16_t>(esp_random() & 0xFFFFU);
+    buf[11] = 0xFF; // next hop: broadcast
+    buf[12] = 0xFE; // destination being advertised: the gateway itself
+    buf[13] = 1; buf[14] = 0; // route cost 1 (x100 scale: a neighbour adds its own link cost), minimum
+    buf[15] = 1; // hop count
+    if (advertVersion_ == 0) advertVersion_ = static_cast<std::uint16_t>(randomSeed16_());
     ++advertVersion_;
-    buf[15] = static_cast<std::uint8_t>(advertVersion_ & 0xFFU);
-    buf[16] = static_cast<std::uint8_t>((advertVersion_ >> 8U) & 0xFFU);
-    const std::uint16_t crc = computeCrc16_(buf.data(), 17);
-    buf[17] = static_cast<std::uint8_t>(crc & 0xFFU);
-    buf[18] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
+    buf[16] = static_cast<std::uint8_t>(advertVersion_ & 0xFFU);
+    buf[17] = static_cast<std::uint8_t>((advertVersion_ >> 8U) & 0xFFU);
+    const std::uint16_t crc = computeCrc16_(buf.data(), 18);
+    buf[18] = static_cast<std::uint8_t>(crc & 0xFFU);
+    buf[19] = static_cast<std::uint8_t>((crc >> 8U) & 0xFFU);
     return radioDriver->send(buf.data(), buf.size());
 }
 
@@ -233,7 +249,7 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
         Serial.flush();
 
         if (destinationId == 0xFEU && sendDataAckPacket_(previousHopId, sequenceNumber, radioDriver)) stats_.ackSent++;
-        if (destinationId == 0xFEU && previousHopId != targetNodeId) (void)sendEndToEndAckPacket_(targetNodeId, sequenceNumber, radioDriver);
+        if (destinationId == 0xFEU && previousHopId != targetNodeId) (void)sendEndToEndAckPacket_(targetNodeId, sequenceNumber, previousHopId, radioDriver);
         return true;
     }
 
@@ -250,7 +266,7 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
                   targetNodeId, sequenceNumber, rssiDbm, static_cast<double>(snrDb));
 
     if (destinationId == 0xFEU && sendDataAckPacket_(previousHopId, sequenceNumber, radioDriver)) stats_.ackSent++;
-    if (destinationId == 0xFEU && previousHopId != targetNodeId && sendEndToEndAckPacket_(targetNodeId, sequenceNumber, radioDriver))
+    if (destinationId == 0xFEU && previousHopId != targetNodeId && sendEndToEndAckPacket_(targetNodeId, sequenceNumber, previousHopId, radioDriver))
         Serial.printf("[E2E ACK TX] node 0x%02X seq %u (came through relay 0x%02X)\n", targetNodeId, sequenceNumber, previousHopId);
     Serial.printf("Data ACK sent\n");
     Serial.printf("--------------------------------\n");

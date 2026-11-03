@@ -25,6 +25,7 @@ struct ParsedPacketView {
     std::uint32_t packetId;
     std::uint8_t destinationId;
     std::uint8_t previousHopId;
+    std::uint8_t nextHopId;
     std::uint8_t packetType;
     const char* packetTypeName;
     std::uint8_t protocolVersion;

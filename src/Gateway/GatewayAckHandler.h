@@ -38,7 +38,7 @@ public:
     bool buildHeartbeatAckPacket(std::uint8_t targetNodeId,
                                  std::uint32_t packetId,
                                  std::uint32_t timestampMs,
-                                 std::array<std::uint8_t, 22>& output);
+                                 std::array<std::uint8_t, 23>& output);
 
     // Returns true if duplicate, false if new
     bool processHeartbeat(std::uint32_t nodeId,
@@ -74,6 +74,7 @@ private:
     // Tells the field node that wrote a packet that it reached the gateway, when the hop ACK alone cannot (the packet came through a relay).
     bool sendEndToEndAckPacket_(std::uint8_t sourceNodeId,
                                std::uint16_t sequenceNumber,
+                               std::uint8_t nextHopId,
                                lora::ILoRaDriver* radioDriver);
 
     bool sendDataAckPacket_(std::uint8_t targetNodeId,

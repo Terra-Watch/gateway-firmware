@@ -40,8 +40,8 @@ int main() {
     std::size_t packetSize = 0;
     assert(terrawatch::protocol::Serializer::serialize(heartbeat, bytes, packetSize));
     assert(bytes[0] == 0xA5U);
-    assert(bytes[1] == 0x04U);
-    assert(packetSize == 26U);
+    assert(bytes[1] == 0x05U);
+    assert(packetSize == 27U);
 
     terrawatch::protocol::PacketParser gatewayParser;
     terrawatch::protocol::PacketValidator gatewayValidator;
@@ -53,7 +53,7 @@ int main() {
     assert(parsed.packetType == 2U && parsed.payloadLength == 13U);
 
     terrawatch::gateway::GatewayAckHandler ackHandler;
-    std::array<std::uint8_t, 22> ackBytes{};
+    std::array<std::uint8_t, 23> ackBytes{};
     assert(ackHandler.buildHeartbeatAckPacket(1U, packetId, 777U, ackBytes));
 
     terrawatch::protocol::Packet ack;
@@ -87,12 +87,20 @@ int main() {
     assert(dataAckHandler.stats().ackSent == 1U);
     assert(dataAckHandler.processDataPacket(1U, 0xFEU, data.previousHopId, data.sequenceNumber, -80, 7.0F, 101U, &radio));
     assert(dataAckHandler.stats().duplicatePackets == 1U);
-    assert(radio.last.size() == 15U);
-    assert(radio.last[4] == data.previousHopId);
-    assert(radio.last[5] == terrawatch::constants::kGatewayNodeId);
+    // The data came through relay 2, not straight from node 1: the gateway acknowledges the relay, then sends node 1 an end-to-end receipt via that relay.
+    assert(radio.last.size() == 16U);
+    assert(radio.last[1] == 0x05U && radio.last[2] == 0x06U);                  // protocol v5, PacketType::EndToEndAck
+    assert(radio.last[3] == terrawatch::constants::kGatewayNodeId && radio.last[4] == 1U);
+    assert(radio.last[5] == terrawatch::constants::kGatewayNodeId && radio.last[11] == data.previousHopId);
+    terrawatch::protocol::Packet receipt;
+    assert(terrawatch::protocol::Parser::parse(radio.last.data(), radio.last.size(), receipt) && terrawatch::protocol::Validator::isValid(receipt));
+    assert(receipt.type == terrawatch::protocol::PacketType::EndToEndAck && receipt.nextHopId == data.previousHopId);
+    assert(receipt.payload[0] == static_cast<std::uint8_t>(data.sequenceNumber & 0xFFU));
     assert(!dataAckHandler.processDataPacket(1U, 0xFFU, data.previousHopId, data.sequenceNumber + 1U, -80, 7.0F, 102U, &radio));
     assert(dataAckHandler.stats().ackSent == 2U);
-    assert(!dataAckHandler.processDataPacket(1U, 0xFEU, data.previousHopId, data.sequenceNumber, -80, 7.0F, 10100U, &radio));
+    // A resend 10 s later is still the same packet (the node resends unconfirmed alerts after 12 s or more); after two minutes it is new.
+    assert(dataAckHandler.processDataPacket(1U, 0xFEU, data.previousHopId, data.sequenceNumber, -80, 7.0F, 10100U, &radio));
+    assert(!dataAckHandler.processDataPacket(1U, 0xFEU, data.previousHopId, data.sequenceNumber, -80, 7.0F, 130000U, &radio));
     assert(dataAckHandler.stats().packetsReceived == 3U);
 
     auto malformed = bytes;
@@ -100,7 +108,7 @@ int main() {
     assert(!terrawatch::protocol::Parser::parse(malformed.data(), packetSize, heartbeat));
 
     auto legacy = bytes;
-    legacy[1] = 3U;
+    legacy[1] = 4U; // the version before the next-hop byte
     assert(gatewayParser.parse(legacy.data(), packetSize, parsed) == terrawatch::protocol::PacketParseResult::parseFailed);
 
     auto wrongAckId = ackBytes;
