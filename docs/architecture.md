@@ -1,19 +1,7 @@
-# Jalri Gateway Firmware Architecture
+# TerraWatch gateway architecture
 
-This repository contains firmware for the Jalri Maritime Edge Gateway.
+`FirmwareComposition` builds the object graph once: SX1278 driver, packet parser and validator, serial logger, `GatewayService`, `App`.
 
-The Gateway receive path depends only on protocol integration interfaces:
+Per loop, `App::tick` asks the driver for a packet and hands it to `GatewayService`, which parses, validates, acknowledges (`GatewayAckHandler`), updates the node registry and prints the packet to the serial port. Only `Sx1278LoRaDriver` and the logger touch Arduino APIs.
 
-```text
-SX1278 -> LoRaDriver -> Raw Bytes -> IPacketParser -> ParsedPacketView -> IPacketValidator -> GatewayService -> Logger
-```
-
-The application layer depends on interfaces and contains no Arduino APIs.
-Platform-specific work remains behind HAL and driver boundaries.
-
-`MockPacketParser` and `MockPacketValidator` are compile-time placeholders only.
-They must be replaced by adapters over the future shared `jalri-protocol` library.
-
-Future modules such as `DeviceRegistry`, `PacketRouter`, `MQTTBridge`,
-`CommandDispatcher`, and `HealthMonitor` should be attached through constructor
-injection in `FirmwareComposition` without changing `App`.
+The wire format is shared with `../node-firmware` (`lib/Protocol`); `test/run_protocol_contract.sh` checks both sides agree.

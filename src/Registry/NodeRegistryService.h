@@ -4,7 +4,7 @@
 #include "NodeLivenessManager.h"
 #include <cstdint>
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 class NodeRegistryService final {
 public:
@@ -36,4 +36,4 @@ private:
     std::uint32_t lastStatsPrintMs_{0};
 };
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

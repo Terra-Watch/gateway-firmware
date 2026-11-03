@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace jalri::logging {
+namespace terrawatch::logging {
 
 enum class LogLevel {
     info,
@@ -70,4 +70,4 @@ public:
     virtual void logRxError(const RxErrorLogRecord& record) = 0;
 };
 
-}  // namespace jalri::logging
+}  // namespace terrawatch::logging

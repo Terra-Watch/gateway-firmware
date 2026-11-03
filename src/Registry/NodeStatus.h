@@ -1,6 +1,6 @@
 #pragma once
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 enum class NodeStatus {
     online,
@@ -18,4 +18,4 @@ inline const char* toString(NodeStatus status) {
     }
 }
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

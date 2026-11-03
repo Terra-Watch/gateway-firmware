@@ -3,7 +3,7 @@
 #include <cstdio>
 #include <array>
 
-namespace jalri::gateway {
+namespace terrawatch::gateway {
 
 std::uint16_t GatewayAckHandler::computeCrc16_(const std::uint8_t* data, std::size_t length) {
     std::uint16_t crc = 0xFFFFU;
@@ -204,4 +204,4 @@ bool GatewayAckHandler::processDataPacket(std::uint8_t targetNodeId,
     return false;
 }
 
-}  // namespace jalri::gateway
+}  // namespace terrawatch::gateway

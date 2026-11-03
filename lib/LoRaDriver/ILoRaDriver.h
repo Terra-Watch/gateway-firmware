@@ -2,7 +2,7 @@
 
 #include "LoRaTypes.h"
 
-namespace jalri::lora {
+namespace terrawatch::lora {
 
 class ILoRaDriver {
 public:
@@ -13,4 +13,4 @@ public:
     virtual bool send(const std::uint8_t* data, std::size_t length) = 0;
 };
 
-}  // namespace jalri::lora
+}  // namespace terrawatch::lora

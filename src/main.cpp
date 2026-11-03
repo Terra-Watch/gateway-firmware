@@ -1,9 +1,10 @@
+
 #include "FirmwareComposition.h"
 
 #include <Arduino.h>
 
 namespace {
-jalri::FirmwareComposition* composition = nullptr;
+terrawatch::FirmwareComposition* composition = nullptr;
 bool loopCheckpointPrinted = false;
 }
 
@@ -12,7 +13,7 @@ void setup() {
     delay(1500);
 
     Serial.println("================================");
-    Serial.println("JALRI GATEWAY - Alive #20");
+    Serial.println("TERRAWATCH GATEWAY");
     Serial.println("================================");
     Serial.flush();
 
@@ -21,7 +22,7 @@ void setup() {
 
     Serial.println("[BOOT] 2: Constructing FirmwareComposition");
     Serial.flush();
-    composition = new jalri::FirmwareComposition();
+    composition = new terrawatch::FirmwareComposition();
 
     Serial.println("[BOOT] 3: App constructed & starting initialization");
     Serial.flush();
@@ -50,4 +51,3 @@ void loop() {
     }
     delay(10);
 }
-

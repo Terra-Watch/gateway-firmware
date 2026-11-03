@@ -2,7 +2,7 @@
 
 #include <cstdint>
 
-namespace jalri::hal {
+namespace terrawatch::hal {
 
 class ISystemClock {
 public:
@@ -11,5 +11,5 @@ public:
     virtual std::uint32_t millis() const = 0;
 };
 
-}  // namespace jalri::hal
+}  // namespace terrawatch::hal
 

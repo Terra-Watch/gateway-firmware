@@ -5,7 +5,7 @@
 #include <LoRa.h>
 #include <SPI.h>
 
-namespace jalri::lora {
+namespace terrawatch::lora {
 
 namespace {
 
@@ -97,6 +97,9 @@ bool Sx1278LoRaDriver::receive(RawRadioPacket& packet) {
     packet.length = bytesRead;
     packet.rssiDbm = LoRa.packetRssi();
     packet.snrDb = LoRa.packetSnr();
+#ifdef TW_RF_DIAGNOSTIC
+    Serial.printf("[RF DIAG] frequency error of the sender: %ld Hz\n", LoRa.packetFrequencyError());
+#endif
     packet.receivedAtMs = millis();
 
     packetsReceivedCounter_++;
@@ -110,17 +113,20 @@ bool Sx1278LoRaDriver::send(const std::uint8_t* data, std::size_t length) {
 
     LoRa.idle();
     LoRa.beginPacket();
+    LoRa.enableCrc();
     const std::size_t written = LoRa.write(data, length);
     if (written != length) {
         LoRa.endPacket();
+        LoRa.enableCrc();
         LoRa.receive();
         return false;
     }
     bool res = (LoRa.endPacket() == 1);
     if (res) acksSentCounter_++;
 
+    LoRa.enableCrc();
     LoRa.receive();
     return res;
 }
 
-}  // namespace jalri::lora
+}  // namespace terrawatch::lora

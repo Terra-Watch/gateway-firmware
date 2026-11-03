@@ -2,7 +2,7 @@
 
 #include "ILogger.h"
 
-namespace jalri::logging {
+namespace terrawatch::logging {
 
 class SerialLogger final : public ILogger {
 public:
@@ -14,4 +14,4 @@ public:
     void logRxError(const RxErrorLogRecord& record) override;
 };
 
-}  // namespace jalri::logging
+}  // namespace terrawatch::logging

@@ -1,6 +1,6 @@
 #include "MockPacketParser.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 PacketParseResult MockPacketParser::parse(const std::uint8_t* bytes,
                                           std::size_t length,
@@ -41,5 +41,5 @@ PacketParseResult MockPacketParser::parse(const std::uint8_t* bytes,
     return PacketParseResult::success;
 }
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

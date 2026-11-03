@@ -2,7 +2,7 @@
 #include <Arduino.h>
 #include <algorithm>
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 HeartbeatProcessResult NodeRegistry::processHeartbeat(std::uint32_t nodeId,
                                                        std::uint32_t packetId,
@@ -113,4 +113,4 @@ void NodeRegistry::clear() {
     totalSnrSum_ = 0.0;
 }
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

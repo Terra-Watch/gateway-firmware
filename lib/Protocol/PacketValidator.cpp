@@ -1,6 +1,6 @@
 #include "PacketValidator.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 PacketValidationResult PacketValidator::validate(const ParsedPacketView& packet) const {
     if (packet.protocolVersion != 4U || packet.nodeId == 0U || packet.previousHopId == 0U) {
@@ -28,4 +28,4 @@ PacketValidationResult PacketValidator::validate(const ParsedPacketView& packet)
     }
 }
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol

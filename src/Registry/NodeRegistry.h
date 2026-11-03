@@ -5,7 +5,7 @@
 #include <unordered_map>
 #include <cstdint>
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 class NodeRegistry final {
 public:
@@ -40,4 +40,4 @@ private:
     double totalSnrSum_{0.0};
 };
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

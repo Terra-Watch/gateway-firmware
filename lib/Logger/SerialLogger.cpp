@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <cstdio>
 
-namespace jalri::logging {
+namespace terrawatch::logging {
 
 void SerialLogger::log(LogLevel level, const char* message) {
     const char* prefix = "[INFO]";
@@ -47,12 +47,12 @@ void SerialLogger::logRawRx(const RawRxLogRecord& record) {
 void SerialLogger::logDeviceRegistryEvent(const RegistryDeviceLogRecord& record) {
     Serial.printf("--------------------------------\n\n");
     if (record.isNewDevice) {
-        Serial.printf("BoatNode Connected\n\n");
+        Serial.printf("Node Connected\n\n");
         Serial.printf("Node: 0x%04X\n\n", static_cast<unsigned>(record.nodeId));
         Serial.printf("RSSI: %d\n\n", record.rssiDbm);
         Serial.printf("SNR: %.1f\n\n", static_cast<double>(record.snrDb));
     } else {
-        Serial.printf("BoatNode Updated\n\n");
+        Serial.printf("Node Updated\n\n");
         Serial.printf("Node: 0x%04X\n\n", static_cast<unsigned>(record.nodeId));
         Serial.printf("Packets Received: %lu\n\n", static_cast<unsigned long>(record.packetsReceived));
         Serial.printf("RSSI: %d\n\n", record.rssiDbm);
@@ -109,4 +109,4 @@ void SerialLogger::logRxError(const RxErrorLogRecord& record) {
     Serial.flush();
 }
 
-}  // namespace jalri::logging
+}  // namespace terrawatch::logging

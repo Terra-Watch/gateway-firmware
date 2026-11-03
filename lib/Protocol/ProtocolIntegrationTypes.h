@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 enum class PacketParseResult {
     success,
@@ -38,4 +38,4 @@ struct ParsedPacketView {
 const char* toString(PacketParseResult result);
 const char* toString(PacketValidationResult result);
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol

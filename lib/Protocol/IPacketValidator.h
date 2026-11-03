@@ -2,7 +2,7 @@
 
 #include "ProtocolIntegrationTypes.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 class IPacketValidator {
 public:
@@ -11,5 +11,5 @@ public:
     virtual PacketValidationResult validate(const ParsedPacketView& packet) const = 0;
 };
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

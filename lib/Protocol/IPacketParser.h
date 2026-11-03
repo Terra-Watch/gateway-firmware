@@ -5,7 +5,7 @@
 
 #include "ProtocolIntegrationTypes.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 class IPacketParser {
 public:
@@ -16,5 +16,5 @@ public:
                                     ParsedPacketView& packet) const = 0;
 };
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

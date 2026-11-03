@@ -1,6 +1,6 @@
 #pragma once
 
-namespace jalri::hal {
+namespace terrawatch::hal {
 
 enum class PinLevel {
     low,
@@ -15,5 +15,5 @@ public:
     virtual PinLevel read() const = 0;
 };
 
-}  // namespace jalri::hal
+}  // namespace terrawatch::hal
 

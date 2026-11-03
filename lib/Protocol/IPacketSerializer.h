@@ -5,7 +5,7 @@
 
 #include "ProtocolIntegrationTypes.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 class IPacketSerializer {
 public:
@@ -17,5 +17,5 @@ public:
                            std::size_t& bytesWritten) const = 0;
 };
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

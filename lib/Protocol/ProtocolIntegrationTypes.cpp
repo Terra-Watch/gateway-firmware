@@ -1,6 +1,6 @@
 #include "ProtocolIntegrationTypes.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 const char* toString(PacketParseResult result) {
     switch (result) {
@@ -34,5 +34,5 @@ const char* toString(PacketValidationResult result) {
     return "UnsupportedProtocol";
 }
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

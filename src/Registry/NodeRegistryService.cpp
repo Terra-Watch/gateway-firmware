@@ -1,7 +1,7 @@
 #include "NodeRegistryService.h"
 #include <Arduino.h>
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 NodeRegistryService::NodeRegistryService(std::uint32_t offlineTimeoutMs)
     : livenessManager_(offlineTimeoutMs) {}
@@ -43,10 +43,7 @@ HeartbeatProcessResult NodeRegistryService::handleHeartbeat(std::uint32_t nodeId
 void NodeRegistryService::tick(std::uint32_t currentMs) {
     livenessManager_.evaluateLiveness(registry_, currentMs);
 
-    if (currentMs - lastStatsPrintMs_ >= 10000U) {
-        lastStatsPrintMs_ = currentMs;
-        printStats();
-    }
+    // Stats are printed by GatewayService from the DeviceRegistry; this one only sees heartbeats.
 }
 
 void NodeRegistryService::printStats() {
@@ -65,4 +62,4 @@ void NodeRegistryService::printStats() {
     Serial.flush();
 }
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

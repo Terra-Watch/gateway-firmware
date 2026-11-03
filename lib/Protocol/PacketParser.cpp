@@ -1,6 +1,6 @@
 #include "PacketParser.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 namespace {
 constexpr std::size_t headerSize = 11U;
 constexpr std::size_t crcSize = 2U;
@@ -69,4 +69,4 @@ PacketParseResult PacketParser::parse(const std::uint8_t* bytes,
     return PacketParseResult::success;
 }
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol

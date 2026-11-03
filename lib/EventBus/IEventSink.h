@@ -1,6 +1,6 @@
 #pragma once
 
-namespace jalri::events {
+namespace terrawatch::events {
 
 template <typename Event>
 class IEventSink {
@@ -10,5 +10,5 @@ public:
     virtual void publish(const Event& event) = 0;
 };
 
-}  // namespace jalri::events
+}  // namespace terrawatch::events
 

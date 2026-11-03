@@ -1,6 +1,6 @@
 #include "MockPacketValidator.h"
 
-namespace jalri::protocol {
+namespace terrawatch::protocol {
 
 PacketValidationResult MockPacketValidator::validate(const ParsedPacketView& packet) const {
     if (packet.nodeId == 0) {
@@ -9,5 +9,5 @@ PacketValidationResult MockPacketValidator::validate(const ParsedPacketView& pac
     return PacketValidationResult::success;
 }
 
-}  // namespace jalri::protocol
+}  // namespace terrawatch::protocol
 

@@ -8,20 +8,17 @@
 #include "Registry/DeviceRegistry.h"
 #include "Registry/NodeRegistryService.h"
 #include "GatewayAckHandler.h"
-#include "BackendIngestionClient.h"
 
-namespace jalri::gateway {
+namespace terrawatch::gateway {
 
 class GatewayService final {
 public:
     GatewayService(const protocol::IPacketParser& parser,
                    const protocol::IPacketValidator& validator,
                    logging::ILogger& logger,
-                   backend::BackendIngestionClient& backendClient,
                    bool debugMode = false);
 
     void handleReceivedPacket(const lora::RawRadioPacket& packet, lora::ILoRaDriver* radioDriver = nullptr);
-    void beginBackend();
     void tick(std::uint32_t currentMs, lora::ILoRaDriver* radioDriver = nullptr);
 
     void setDebugMode(bool enabled) { debugMode_ = enabled; }
@@ -42,9 +39,9 @@ private:
     bool debugMode_;
     registry::DeviceRegistry deviceRegistry_;
     registry::NodeRegistryService nodeRegistryService_;
+    std::uint32_t lastStatsMs_{0};
     GatewayAckHandler ackHandler_;
-    backend::BackendIngestionClient& backendClient_;
     std::uint32_t lastTablePrintMs_{0};
 };
 
-}  // namespace jalri::gateway
+}  // namespace terrawatch::gateway

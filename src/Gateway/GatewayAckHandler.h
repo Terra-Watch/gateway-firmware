@@ -6,7 +6,7 @@
 #include <array>
 #include "ILoRaDriver.h"
 
-namespace jalri::gateway {
+namespace terrawatch::gateway {
 
 struct GatewayStats {
     std::uint32_t packetsReceived = 0;
@@ -83,4 +83,4 @@ private:
     std::uint16_t ackSeq_ = 1;
 };
 
-}  // namespace jalri::gateway
+}  // namespace terrawatch::gateway

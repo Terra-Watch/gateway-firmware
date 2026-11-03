@@ -1,6 +1,6 @@
 #include "DeviceRegistry.h"
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 const char* toString(OnlineStatus status) {
     switch (status) {
@@ -92,4 +92,4 @@ void DeviceRegistry::clear() {
     devices_.clear();
 }
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

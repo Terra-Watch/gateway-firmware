@@ -2,7 +2,7 @@
 
 #include <Arduino.h>
 
-namespace jalri {
+namespace terrawatch {
 
 namespace {
 constexpr std::uint32_t heartbeatIntervalMs = 5000U;
@@ -16,7 +16,7 @@ App::App(lora::ILoRaDriver& loraDriver,
       logger_(logger) {}
 
 bool App::begin() {
-    logger_.log(logging::LogLevel::info, "Jalri Gateway Firmware Starting...");
+    logger_.log(logging::LogLevel::info, "TerraWatch gateway starting...");
     if (!loraDriver_.begin()) {
         Serial.println("[LoRa] SX1278 initialization FAILED");
         Serial.println();
@@ -27,14 +27,12 @@ bool App::begin() {
         return false;
     }
 
-    gatewayService_.beginBackend();
-
     Serial.println("[LoRa] SX1278 initialization SUCCESS");
     Serial.println();
     if (Serial) {
         Serial.flush();
     }
-    logger_.log(logging::LogLevel::info, "LoRa driver initialized successfully. Listening for physical BoatNode heartbeats...");
+    logger_.log(logging::LogLevel::info, "LoRa driver initialized successfully. Listening for field node packets...");
     return true;
 }
 
@@ -76,4 +74,4 @@ void App::printHeartbeat(std::uint32_t currentMs) {
     }
 }
 
-}  // namespace jalri
+}  // namespace terrawatch

@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace jalri::lora {
+namespace terrawatch::lora {
 
 struct RawRadioPacket {
     const std::uint8_t* bytes;
@@ -15,4 +15,4 @@ struct RawRadioPacket {
 
 using LoRaPacket = RawRadioPacket;
 
-}  // namespace jalri::lora
+}  // namespace terrawatch::lora

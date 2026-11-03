@@ -4,7 +4,7 @@
 #include <cstdint>
 #include "NodeStatus.h"
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 struct NodeInfo {
     std::uint32_t nodeId{0};
@@ -38,4 +38,4 @@ enum class HeartbeatProcessResult {
     duplicate
 };
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

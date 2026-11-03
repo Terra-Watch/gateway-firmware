@@ -5,7 +5,7 @@
 
 #include "ILoRaDriver.h"
 
-namespace jalri::lora {
+namespace terrawatch::lora {
 
 class Sx1278LoRaDriver final : public ILoRaDriver {
 public:
@@ -29,4 +29,4 @@ private:
     uint32_t acksSentCounter_{0};
 };
 
-}  // namespace jalri::lora
+}  // namespace terrawatch::lora

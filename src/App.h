@@ -6,7 +6,7 @@
 
 #include <cstdint>
 
-namespace jalri {
+namespace terrawatch {
 
 class App final {
 public:
@@ -26,4 +26,4 @@ private:
     void printHeartbeat(std::uint32_t currentMs);
 };
 
-}  // namespace jalri
+}  // namespace terrawatch

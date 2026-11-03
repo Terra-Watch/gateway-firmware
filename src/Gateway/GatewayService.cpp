@@ -2,17 +2,15 @@
 
 #include <Arduino.h>
 
-namespace jalri::gateway {
+namespace terrawatch::gateway {
 
 GatewayService::GatewayService(const protocol::IPacketParser& parser,
                                const protocol::IPacketValidator& validator,
                                logging::ILogger& logger,
-                               backend::BackendIngestionClient& backendClient,
                                bool debugMode)
     : parser_(parser),
       validator_(validator),
       logger_(logger),
-      backendClient_(backendClient),
       debugMode_(debugMode) {}
 
 void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lora::ILoRaDriver* radioDriver) {
@@ -76,6 +74,12 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
         Serial.flush();
     }
 
+    // A relay's route advertisement (type 5) is relay-to-relay traffic: the gateway does not use it, so it is not an error.
+    if (parsed.packetType == 5U) {
+        Serial.printf("[RELAY] route advertisement from 0x%02X ignored\n", static_cast<unsigned>(parsed.nodeId));
+        return;
+    }
+
     // 3. Validator
     const protocol::PacketValidationResult validationResult =
         validator_.validate(parsed);
@@ -119,18 +123,12 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
             packet.receivedAtMs,
             radioDriver
         );
-        if (!isDuplicate && parsed.payloadLength == 12U && parsed.payload[0] == 0x54U && parsed.payload[1] == 1U) {
-            const auto *p = parsed.payload;
-            const std::uint16_t year = static_cast<std::uint16_t>(p[3] | (p[4] << 8U));
-            const std::int16_t temperature = static_cast<std::int16_t>(static_cast<std::uint16_t>(p[10] | (p[11] << 8U)));
-            Serial.println("[TELEMETRY RX]");
-            Serial.printf("source=0x%02X\n", static_cast<unsigned>(parsed.nodeId));
-            Serial.printf("sequence=%lu\n", static_cast<unsigned long>(parsed.sequenceNumber));
-            Serial.printf("temperatureC=%.2f\n", static_cast<double>(temperature) / 100.0);
-            backendClient_.enqueueTelemetry(parsed, packet);
-        }
-        if (!isDuplicate && parsed.payloadLength >= 21U && parsed.payload[0] == 0x4AU && parsed.payload[1] == 0x43U && parsed.payload[2] == 0x4DU && parsed.payload[3] == 0x31U) {
-            backendClient_.reportCrewMessageReceipt(parsed);
+        if (!isDuplicate) {
+            Serial.printf("[DATA RX] source=0x%02X sequence=%lu rssi=%d snr=%.1f payload=",
+                          static_cast<unsigned>(parsed.nodeId), static_cast<unsigned long>(parsed.sequenceNumber),
+                          packet.rssiDbm, static_cast<double>(packet.snrDb));
+            for (std::size_t i = 0; i < parsed.payloadLength; ++i) Serial.printf("%02X", parsed.payload[i]);
+            Serial.println();
         }
     } else {
         if (parsed.packetType != 2U) {
@@ -158,8 +156,6 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
             packet.receivedAtMs
         );
 
-        // ACK is sent by processHeartbeat above before this backend queue operation.
-        backendClient_.enqueueHeartbeat(parsed, packet);
     }
 
     if (isDuplicate) {
@@ -192,14 +188,23 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
     }
 }
 
-void GatewayService::beginBackend() {
-    backendClient_.begin();
-}
-
 void GatewayService::tick(std::uint32_t currentMs, lora::ILoRaDriver* radioDriver) {
     nodeRegistryService_.tick(currentMs);
-    backendClient_.tick(currentMs);
-    if (radioDriver != nullptr) backendClient_.dispatchMessages(*radioDriver);
+    (void)radioDriver;
+
+    if (currentMs - lastStatsMs_ >= 10000U) {
+        lastStatsMs_ = currentMs;
+        deviceRegistry_.updateStatus(currentMs);
+        Serial.println("================================");
+        Serial.println("NODE REGISTRY STATISTICS");
+        Serial.printf("Total Nodes: %zu\n", deviceRegistry_.deviceCount());
+        for (const auto& d : deviceRegistry_.getAllDevices()) {
+            Serial.printf("Node 0x%02X: %s | packets=%lu | RSSI=%d dBm | SNR=%.1f dB\n",
+                          static_cast<unsigned>(d.nodeId), registry::toString(d.onlineStatus),
+                          static_cast<unsigned long>(d.packetsReceived), d.lastRssiDbm, static_cast<double>(d.lastSnrDb));
+        }
+        Serial.println("================================");
+    }
 }
 
-}  // namespace jalri::gateway
+}  // namespace terrawatch::gateway

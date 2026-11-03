@@ -1,7 +1,7 @@
 #include "NodeLivenessManager.h"
 #include <Arduino.h>
 
-namespace jalri::registry {
+namespace terrawatch::registry {
 
 NodeLivenessManager::NodeLivenessManager(std::uint32_t offlineTimeoutMs)
     : offlineTimeoutMs_(offlineTimeoutMs) {}
@@ -42,4 +42,4 @@ void NodeLivenessManager::handleNodeReconnected(NodeInfo& node) {
     }
 }
 
-}  // namespace jalri::registry
+}  // namespace terrawatch::registry

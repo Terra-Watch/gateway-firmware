@@ -3,7 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 
-namespace jalri::hal {
+namespace terrawatch::hal {
 
 class ISpiBus {
 public:
@@ -14,5 +14,5 @@ public:
                           std::size_t length) = 0;
 };
 
-}  // namespace jalri::hal
+}  // namespace terrawatch::hal
 
