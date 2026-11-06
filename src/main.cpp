@@ -1,5 +1,6 @@
 
 #include "FirmwareComposition.h"
+#include "Uplink/Uplink.h"
 
 #include <Arduino.h>
 
@@ -37,6 +38,8 @@ void setup() {
         Serial.println("[BOOT] 5: Setup completed (LoRa Driver init returned false - check physical SX1278 wiring)");
     }
     Serial.flush();
+    terrawatch::uplink::Uplink::instance().begin();
+    Serial.println(terrawatch::uplink::Uplink::instance().enabled() ? "[UPLINK] enabled" : "[UPLINK] off (no include/Secrets.h)");
 }
 
 void loop() {

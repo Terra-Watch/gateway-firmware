@@ -1,4 +1,5 @@
 #include "GatewayService.h"
+#include "Uplink/Uplink.h"
 
 #include <Arduino.h>
 
@@ -129,6 +130,10 @@ void GatewayService::handleReceivedPacket(const lora::RawRadioPacket& packet, lo
                           packet.rssiDbm, static_cast<double>(packet.snrDb));
             for (std::size_t i = 0; i < parsed.payloadLength; ++i) Serial.printf("%02X", parsed.payload[i]);
             Serial.println();
+            uplink::DataEvent event{static_cast<std::uint8_t>(parsed.nodeId), static_cast<std::uint16_t>(parsed.sequenceNumber), static_cast<std::int16_t>(packet.rssiDbm), packet.snrDb,
+                                    static_cast<std::uint8_t>(parsed.payloadLength < sizeof(event.payload) ? parsed.payloadLength : sizeof(event.payload)), {}};
+            for (std::size_t i = 0; i < event.length; ++i) event.payload[i] = parsed.payload[i];
+            uplink::Uplink::instance().enqueue(event);
         }
     } else {
         if (parsed.packetType != 2U) {
