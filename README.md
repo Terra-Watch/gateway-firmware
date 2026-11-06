@@ -2,10 +2,10 @@
 
 ESP32-S3 + SX1278 (433 MHz) LoRa receiver for the fixed forest stations. It listens for packets from stations and relays, validates them, sends the acknowledgement, keeps a node table, and prints each packet on the serial port.
 
-It has no Wi-Fi, no HTTP and no backend client. Getting readings from the serial port into the TerraWatch backend (`../docs/13-lookout-stations.md`, section 4) is a later step.
+It has no Wi-Fi, no HTTP and no backend client. Readings go from the serial port to the TerraWatch backend through the bridge script `../website/backend/scripts/station_bridge.py`; setup is in `../website/docs/STATIONS_BRIDGE_SETUP.md`.
 
 ```
-station --LoRa--> [relay ...] --LoRa--> gateway --serial--> (bridge, later) --> backend
+station --LoRa--> [relay ...] --LoRa--> gateway --serial--> bridge --> backend
 ```
 
 ## What it does
