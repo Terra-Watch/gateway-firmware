@@ -13,3 +13,4 @@ __pycache__/
 *.key
 
 include/Secrets.h
+compile_commands.json
