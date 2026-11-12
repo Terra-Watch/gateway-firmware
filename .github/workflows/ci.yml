@@ -14,9 +14,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { path: gateway-firmware }
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with: { repository: Terra-Watch/node-firmware, path: node-firmware }
       - run: bash test/run_protocol_contract.sh
         working-directory: gateway-firmware
@@ -29,10 +29,10 @@ jobs:
       matrix:
         env: [esp32-s3-devkitm-1, diagnostic-gateway]
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with: { python-version: "3.11" }
-      - uses: actions/cache@v4
+      - uses: actions/cache@v6
         with:
           path: ~/.platformio
           key: pio-${{ runner.os }}-${{ hashFiles('platformio.ini') }}
